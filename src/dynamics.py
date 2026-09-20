@@ -24,6 +24,7 @@ point-mass meteor model with drag and ablation.
 import numpy as np
 from atmosphere import density
 from gravity import gravity
+from wind import wind_components
 
 # ---------------------------------------------------------------------
 # Constants
@@ -56,6 +57,9 @@ DEFAULT_PARAMS = {
                         # for Cavezzo fragment F2 (Gardiol et al. 2021)
     "atmosphere_model": "table",  # "exp" or "table" — see atmosphere.py
     "gravity_model": "spherical",  # see gravity.py
+    "wind_model": "none",  # "none" or "cavezzo" — see wind.py. Simplified
+                            # horizontal-advection drift, only meaningful
+                            # once the meteor is slow (dark flight).
 }
 
 
@@ -130,6 +134,12 @@ def meteor_rhs(t, y, params=None):
     phi_dot = (V * np.cos(gamma) * np.cos(psi)) / (R_E + h)
 
     lambda_dot = (V * np.cos(gamma) * np.sin(psi)) / ((R_E + h) * np.cos(phi))
+
+    # Optional wind drift (simplified horizontal advection, see wind.py).
+    if p["wind_model"] == "cavezzo":
+        W_north, W_east = wind_components(h)
+        phi_dot += W_north / (R_E + h)
+        lambda_dot += W_east / ((R_E + h) * np.cos(phi))
 
     psi_dot = 0.0
 
