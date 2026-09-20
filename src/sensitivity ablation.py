@@ -52,7 +52,7 @@ def run_sweep(sigma_abl_values, t_span=(0.0, 600.0)):
     for sigma_abl in sigma_abl_values:
         params = {**DEFAULT_PARAMS, "sigma_abl": sigma_abl}
         sol = run_trajectory(y0, t_span, method="RK45", rtol=1e-8,
-                              atol=1e-10, params=params)
+                              atol=1e-10, params=params, max_step=5.0)
         y_impact = impact_state(sol)
 
         if y_impact is None:
@@ -82,48 +82,63 @@ def run_sweep(sigma_abl_values, t_span=(0.0, 600.0)):
     }
 
 
-def plot_sweep(results):
+def plot_sweep(results, highlight_value=None):
+    """
+    Same as before, but optionally highlights one specific sigma_abl
+    value (e.g. the project's baseline) with a distinct marker and
+    vertical guide line on each panel.
+    """
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 
-    ax = axes[0]
-    ax.plot(results["sigma_abl"], results["distance_km"], "o-",
-             color="tab:blue")
-    ax.set_xscale("log")
-    ax.set_xlabel(r"$\sigma_{abl}$ (kg/J)")
-    ax.set_ylabel("Distance from recovery site (km)")
-    ax.set_title("Impact-location sensitivity")
-    ax.grid(True, which="both", linestyle="--", alpha=0.4)
+    panels = [
+        (axes[0], "distance_km", "tab:blue", "Distance from recovery site (km)",
+         "Impact-location sensitivity"),
+        (axes[1], "impact_velocity_ms", "tab:orange", "Impact velocity (m/s)",
+         "Impact-velocity sensitivity"),
+        (axes[2], "final_mass_kg", "tab:green", "Final mass (kg)",
+         "Terminal-mass sensitivity"),
+    ]
 
-    ax = axes[1]
-    ax.plot(results["sigma_abl"], results["impact_velocity_ms"], "o-",
-             color="tab:orange")
-    ax.set_xscale("log")
-    ax.set_xlabel(r"$\sigma_{abl}$ (kg/J)")
-    ax.set_ylabel("Impact velocity (m/s)")
-    ax.set_title("Impact-velocity sensitivity")
-    ax.grid(True, which="both", linestyle="--", alpha=0.4)
+    highlight_idx = None
+    if highlight_value is not None:
+        highlight_idx = int(np.argmin(np.abs(results["sigma_abl"] - highlight_value)))
 
-    ax = axes[2]
-    ax.plot(results["sigma_abl"], results["final_mass_kg"], "o-",
-             color="tab:green")
-    ax.set_xscale("log")
-    ax.set_xlabel(r"$\sigma_{abl}$ (kg/J)")
-    ax.set_ylabel("Final mass (kg)")
-    ax.set_title("Terminal-mass sensitivity")
-    ax.axhline(1.5, color="gray", linestyle=":",
-                label="Paper's terminal mass (1.5 kg, at h=21.5 km)")
-    ax.legend(fontsize=8)
-    ax.grid(True, which="both", linestyle="--", alpha=0.4)
+    for ax, key, color, ylabel, title in panels:
+        ax.plot(results["sigma_abl"], results[key], "o-", color=color)
+        ax.set_xscale("log")
+        ax.set_xlabel(r"$\sigma_{abl}$ (kg/J)")
+        ax.set_ylabel(ylabel)
+        ax.set_title(title)
+        ax.grid(True, which="both", linestyle="--", alpha=0.4)
+
+        if highlight_idx is not None:
+            x_h = results["sigma_abl"][highlight_idx]
+            y_h = results[key][highlight_idx]
+            ax.plot(x_h, y_h, "*", color="red", markersize=18,
+                     markeredgecolor="black", zorder=5,
+                     label=f"Baseline ({x_h:.2e} kg/J)")
+            ax.axvline(x_h, color="red", linestyle=":", alpha=0.5)
+            ax.legend(fontsize=8)
+
+    axes[2].axhline(1.5, color="gray", linestyle=":",
+                      label="Paper's terminal mass (1.5 kg, at h=21.5 km)")
+    axes[2].legend(fontsize=8)
 
     fig.tight_layout()
     plt.show()
 
 
 if __name__ == "__main__":
-    # Log-spaced sweep from ~1e-9 to ~1e-7 kg/J (7 points), covering
+    # Log-spaced sweep from ~1e-9 to ~1e-7 kg/J (20 points), covering
     # both the generic-CH-derived low end and Moscati et al.'s
-    # empirically-calibrated high end.
-    sigma_abl_values = np.logspace(-9, -7, 7)
+    # empirically-calibrated high end. Dense enough to resolve the
+    # location-minimizing value precisely (see project notes).
+    BASELINE_SIGMA_ABL = DEFAULT_PARAMS["sigma_abl"]  # 8.0e-8, the project's default
+
+    sigma_abl_values = np.logspace(-9, -7, 20)
+    # Insert the exact baseline value so it appears as a real,
+    # labeled point on the curve rather than something interpolated.
+    sigma_abl_values = np.sort(np.append(sigma_abl_values, BASELINE_SIGMA_ABL))
 
     results = run_sweep(sigma_abl_values)
-    plot_sweep(results)
+    plot_sweep(results, highlight_value=BASELINE_SIGMA_ABL)
