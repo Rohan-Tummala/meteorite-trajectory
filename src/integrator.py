@@ -114,7 +114,7 @@ if __name__ == "__main__":
     # Quick manual sanity check: integrate the Cavezzo trajectory with
     # default (moderate) tolerances over a generous time span, and
     # report whether/where it hit the ground.
-    from Cavezzo import initial_state
+    from cavezzo import initial_state
 
     y0 = initial_state()
     t_span = (0.0, 600.0)  # s — generous upper bound; dark-flight descent
