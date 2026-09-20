@@ -144,5 +144,75 @@ def plot_full_trajectory():
     return sol
 
 
+# Digitized reference points from Fig. 4c of Gardiol et al. (2021),
+# via WebPlotDigitizer. Update this path if your filename differs.
+DIGITIZED_VELOCITY_FILE = "cavezzo_vel_vs_time.csv"
+
+
+def load_digitized_velocity(path):
+    """
+    Load digitized (time, velocity) points exported by
+    WebPlotDigitizer, from Gardiol et al. (2021), Fig. 4c. Assumes
+    time (s) in column 0, velocity (km/s) in column 1, regardless of
+    header text.
+    """
+    if str(path).lower().endswith(".csv"):
+        df = pd.read_csv(path)
+    else:
+        df = pd.read_excel(path)
+    t_data = df.iloc[:, 0].to_numpy(dtype=float)
+    v_data = df.iloc[:, 1].to_numpy(dtype=float)
+    order = np.argsort(t_data)
+    return t_data[order], v_data[order]
+
+
+def plot_velocity_validation(velocity_uncertainty_kms=2.0):
+    """
+    Plot the model's velocity-vs-time curve over the luminous-flight
+    window against digitized reference points from Fig. 4c, with a
+    shaded uncertainty band of +/- velocity_uncertainty_kms around the
+    digitized data.
+    """
+    y0 = initial_state()
+    t_span = (0.0, 5.6)
+
+    sol = run_trajectory(y0, t_span, method="RK45", rtol=1e-9, atol=1e-11,
+                          dense_output=True)
+
+    t_fine = np.linspace(t_span[0], t_span[1], 300)
+    v_model = sol.sol(t_fine)[1] / 1000.0  # m/s -> km/s
+
+    fig, ax = plt.subplots(figsize=(7, 5))
+
+    try:
+        t_data, v_data = load_digitized_velocity(DIGITIZED_VELOCITY_FILE)
+
+        # Shaded uncertainty band around the digitized curve.
+        ax.fill_between(t_data, v_data - velocity_uncertainty_kms,
+                          v_data + velocity_uncertainty_kms,
+                          color="tab:orange", alpha=0.2,
+                          label=f"Digitized \u00b1{velocity_uncertainty_kms:g} km/s band")
+        ax.plot(t_data, v_data, "o", color="tab:orange", markersize=5,
+                 alpha=0.8, label="Digitized (Gardiol et al. 2021, Fig. 4c)")
+    except FileNotFoundError:
+        print(f"Note: '{DIGITIZED_VELOCITY_FILE}' not found — plotting "
+              f"model curve only.")
+
+    ax.plot(t_fine, v_model, "-", color="tab:blue", linewidth=2,
+             label="Model")
+
+    ax.set_xlim(0.0, 6.0)
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Velocity (km/s)")
+    ax.set_title("Trajectory validation: velocity vs. time (luminous flight)")
+    ax.legend(fontsize=8)
+    ax.grid(True, linestyle="--", alpha=0.4)
+    fig.tight_layout()
+    plt.show()
+
+    return sol
+
+
 if __name__ == "__main__":
     plot_full_trajectory()
+    plot_velocity_validation()
