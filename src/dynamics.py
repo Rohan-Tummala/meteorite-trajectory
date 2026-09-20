@@ -41,10 +41,19 @@ R_E = 6371000.0  # mean Earth radius, m (kept consistent with gravity.py)
 # with values justified for your chosen meteor event (e.g. Cavezzo).
 
 DEFAULT_PARAMS = {
-    "Cd": 1.0,        # drag coefficient, dimensionless
-    "CH": 0.1,        # heat transfer / ablation coefficient, dimensionless
-    "Q": 8.0e6,        # heat of ablation, J/kg
-    "rho_m": 3300.0,   # meteoroid bulk density, kg/m^3 (typical stony chondrite)
+    "Cd": 1.16,        # drag coefficient, dimensionless — Mach > 4 plateau
+                        # value from the Ceplecha (1987) Cd(M) curve, as
+                        # reported in Moscati et al. (2027, Icarus 461,
+                        # 117303, Fig. 1). Cavezzo's speed (4-12.2 km/s)
+                        # stays well above Mach 4 throughout the luminous
+                        # flight, so this constant is a reasonable
+                        # simplification of the full Mach-dependent curve.
+    "sigma_abl": 8.0e-8,  # ablation coefficient CH/Q, kg/J — midpoint of
+                        # the 7-9e-8 kg/J range empirically calibrated by
+                        # Moscati et al. (2027) against several real falls,
+                        # Cavezzo explicitly included among them.
+    "rho_m": 3322.0,   # meteoroid bulk density, kg/m^3 — measured value
+                        # for Cavezzo fragment F2 (Gardiol et al. 2021)
     "atmosphere_model": "table",  # "exp" or "table" — see atmosphere.py
     "gravity_model": "spherical",  # see gravity.py
 }
@@ -124,9 +133,14 @@ def meteor_rhs(t, y, params=None):
 
     psi_dot = 0.0
 
-    M_dot = -(p["CH"] * A * rho * V ** 3) / (2.0 * p["Q"])
-    # Don't let mass go negative once (numerically) ablated away.
-    if M <= 0.0 and M_dot < 0.0:
+    M_dot = -(p["sigma_abl"] * A * rho * V ** 3) / 2.0
+    # Ablation stops once the meteor transitions to "dark flight" — the
+    # velocity threshold below which luminous ablation becomes negligible
+    # (Moilanen et al. 2021, adopted by Moscati et al. 2027 as a standard
+    # operational criterion), rather than only guarding against M <= 0.
+    if V < 3000.0:
+        M_dot = 0.0
+    elif M <= 0.0 and M_dot < 0.0:
         M_dot = 0.0
 
     return np.array([h_dot, V_dot, gamma_dot, phi_dot, lambda_dot, psi_dot, M_dot])
