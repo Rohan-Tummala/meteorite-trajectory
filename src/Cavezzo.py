@@ -65,8 +65,15 @@ LAMBDA0_DEG = _dms_to_deg(10, 43, 9)
 LAMBDA0 = np.radians(LAMBDA0_DEG)
 LAMBDA0_UNC = np.radians(7.0 / 3600.0)
 
-# Azimuth/heading, rad (Table 3: 238.1 +/- 0.2 deg, WSW to ENE travel)
-PSI0 = np.radians(238.1)
+# Azimuth/heading, rad. Table 3 reports the trajectory azimuth as
+# 238.1 +/- 0.2 deg, but this is the classical meteor-astronomy
+# convention (direction back toward the radiant), which is the
+# RECIPROCAL of the direction of travel. Confirmed against the
+# paper's own beginning/end coordinates: lat and lon both increase
+# (bearing ~58 deg, ENE), matching 238.1 - 180 = 58.1 deg, not 238.1
+# deg directly. The dynamics.py equations need the travel heading,
+# so we apply the 180-degree correction here.
+PSI0 = np.radians(238.1 - 180.0)
 PSI0_UNC = np.radians(0.2)
 
 # Pre-atmospheric mass, kg (Table 3, beginning: 3.5 +/- 0.8 kg)
