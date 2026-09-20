@@ -52,25 +52,94 @@ def exponential_density(h):
 # Tabulated model (interpolated)
 # ---------------------------------------------------------------------
 
-# Standard Atmosphere density table (e.g. Anderson, Introduction to
-# Flight, Table 1-5). Altitude in metres (converted from the table's
-# km), density in kg/m^3. The table's -1 km row is dropped since
-# altitude in this simulation is never negative.
-_TABLE_ALTITUDE_KM = np.array(
-    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 20, 25, 30, 32,
-     35, 40, 45, 47, 50, 51, 60, 70, 71, 80, 84.9, 89.7, 100.4, 105, 110],
-    dtype=float
-)
-_TABLE_ALTITUDE_M = _TABLE_ALTITUDE_KM * 1000.0
+# ---------------------------------------------------------------------
+# COESA 1976 Standard Atmosphere (analytic, piecewise)
+# ---------------------------------------------------------------------
+# This is the actual defining model behind every "standard atmosphere"
+# table you'll find in a textbook — tables are just sampled points from
+# these equations. Implementing it directly avoids transcription error
+# and lets us sample it at any resolution we want to build the
+# interpolation table below, rather than relying on someone else's
+# rounded, fixed-resolution table.
+#
+# Reference: U.S. Standard Atmosphere, 1976, U.S. Government Printing
+# Office, Washington, D.C. Layer definitions per COESA (1976); see also
+# https://www.pdas.com/atmos.html for a clear summary of the equations.
 
-_TABLE_DENSITY_KGM3 = np.array(
-    [1.2250, 1.1116, 1.0065, 0.9091, 0.8191, 0.7361, 0.6597, 0.5895,
-     0.5252, 0.4664, 0.4127, 0.3639, 0.2655, 0.1937, 0.1423, 0.0880,
-     0.0395, 0.0180, 0.0132, 0.0082, 0.0039, 0.0019, 0.0014, 0.0010,
-     0.00086, 0.000288, 0.000074, 0.000064, 0.000015, 0.000007,
-     0.000003, 0.0000005, 0.0000002, 0.0000001],
-    dtype=float
-)
+_G0 = 9.80665          # m/s^2
+_R_AIR = 287.053        # J/(kg*K), specific gas constant for air
+_R_EARTH_GEOPOTENTIAL = 6356766.0  # m, used to convert geometric -> geopotential altitude
+
+# Each row: (base geopotential altitude H_b [m], base temperature T_b [K],
+#            base pressure P_b [Pa], lapse rate L_b [K/m])
+_COESA_LAYERS = np.array([
+    [0.0,     288.15, 101325.0,    -0.0065],
+    [11000.0, 216.65, 22632.0064,   0.0],
+    [20000.0, 216.65, 5474.8890,    0.0010],
+    [32000.0, 228.65, 868.0187,     0.0028],
+    [47000.0, 270.65, 110.9063,     0.0],
+    [51000.0, 270.65, 66.9389,     -0.0028],
+    [71000.0, 214.65, 3.95642,     -0.0020],
+])
+_COESA_MAX_GEOMETRIC_M = 86000.0  # equations below are valid up to ~86 km geometric altitude
+
+
+def _geopotential_altitude(z):
+    """Convert geometric altitude z (m) to geopotential altitude H (m)."""
+    return _R_EARTH_GEOPOTENTIAL * z / (_R_EARTH_GEOPOTENTIAL + z)
+
+
+def _coesa_density_scalar(z):
+    """COESA 1976 density at a single geometric altitude z (m)."""
+    H = _geopotential_altitude(z)
+    # find the highest layer whose base altitude is <= H
+    idx = np.searchsorted(_COESA_LAYERS[:, 0], H, side="right") - 1
+    idx = np.clip(idx, 0, len(_COESA_LAYERS) - 1)
+    H_b, T_b, P_b, L_b = _COESA_LAYERS[idx]
+
+    if L_b != 0.0:
+        T = T_b + L_b * (H - H_b)
+        P = P_b * (T / T_b) ** (-_G0 / (L_b * _R_AIR))
+    else:
+        T = T_b
+        P = P_b * np.exp(-_G0 * (H - H_b) / (_R_AIR * T_b))
+
+    return P / (_R_AIR * T)
+
+
+def coesa_density(h):
+    """
+    COESA 1976 Standard Atmosphere density, computed directly from the
+    defining piecewise equations (not interpolated from a table).
+
+    Parameters
+    ----------
+    h : float or array_like
+        Geometric altitude above sea level, in metres. Valid up to
+        ~86,000 m; values above this raise a warning and are clipped.
+
+    Returns
+    -------
+    float or ndarray
+        Atmospheric density in kg/m^3.
+    """
+    h = np.asarray(h, dtype=float)
+    if np.any(h > _COESA_MAX_GEOMETRIC_M):
+        print(f"Warning: COESA 1976 equations are only valid up to "
+              f"{_COESA_MAX_GEOMETRIC_M} m geometric altitude — clipping.")
+    h_clipped = np.clip(h, 0.0, _COESA_MAX_GEOMETRIC_M)
+
+    if h_clipped.ndim == 0:
+        return _coesa_density_scalar(float(h_clipped))
+    return np.array([_coesa_density_scalar(hi) for hi in h_clipped])
+
+
+# Build the interpolation table by sampling the COESA equations directly,
+# rather than transcribing a textbook table by hand. Resolution here
+# (1 km spacing) can be changed freely, e.g. to study how table
+# resolution affects interpolation accuracy.
+_TABLE_ALTITUDE_M = np.arange(0.0, _COESA_MAX_GEOMETRIC_M + 1.0, 1000.0)
+_TABLE_DENSITY_KGM3 = coesa_density(_TABLE_ALTITUDE_M)
 
 # Build the interpolator once at import time so repeated calls are cheap.
 # bounds_error=False + fill_value="extrapolate" avoids crashing on values
@@ -93,7 +162,7 @@ def tabulated_density(h):
     ----------
     h : float or array_like
         Altitude above sea level, in metres. Values outside the table
-        range (0 to 110,000 m) are linearly extrapolated; a warning is
+        range (0 to 86,000 m) are linearly extrapolated; a warning is
         printed once per call if this happens, since extrapolated
         density is not physically validated.
 
@@ -170,10 +239,19 @@ def plot_atmosphere_comparison(interp_kind="linear"):
     ax.plot(h_fine, exponential_density(h_fine), "-", color="tab:blue",
              linewidth=2, label="Exponential model")
 
-    # Tabulated model: raw table points connected with a dotted line.
+    # COESA 1976 model: the true underlying curve, evaluated directly
+    # (no interpolation). Plotted as a dashed line so it's visible even
+    # where it nearly overlaps the interpolated table below.
+    ax.plot(h_fine, coesa_density(h_fine), "--", color="tab:green",
+             linewidth=2, label="COESA 1976 model (exact evaluation)")
+
+    # Tabulated model: table points connected with a dotted line (this
+    # dotted line *is* the interpolated result). Markers kept small
+    # since the table is now densely sampled (1 km spacing).
     ax.plot(_TABLE_ALTITUDE_M, _TABLE_DENSITY_KGM3, "o:", color="tab:orange",
-             linewidth=1.5, markersize=6,
-             label=f"Tabulated model ({interp_kind} interpolation)")
+             linewidth=1.2, markersize=2,
+             label=f"Tabulated model ({interp_kind} interpolation, "
+                   f"COESA 1976, 1 km spacing)")
 
     ax.set_yscale("log")  # density spans several orders of magnitude
     ax.set_xlabel("Altitude, h (m)")
