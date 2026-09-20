@@ -15,11 +15,16 @@ together.
 """
 
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
 from integrator import run_trajectory, impact_state
 from cavezzo import initial_state, RECOVERY_LAT, RECOVERY_LON, \
     RECOVERY_LAT_DEG, RECOVERY_LON_DEG
+
+# Digitized reference points from Fig. 4a of Gardiol et al. (2021),
+# via WebPlotDigitizer. Update this path if your filename differs.
+DIGITIZED_FILE = "cavezzo_height_vs_time.csv"
 
 
 def great_circle_distance(lat1, lon1, lat2, lon2, R=6371000.0):
@@ -35,11 +40,25 @@ def great_circle_distance(lat1, lon1, lat2, lon2, R=6371000.0):
     return R * c
 
 
+def load_digitized_height(path):
+    """
+    Load digitized (time, height) points exported by WebPlotDigitizer,
+    from Gardiol et al. (2021), Fig. 4a. Assumes time (s) in column 0,
+    height (km) in column 1, regardless of header text. File is CSV.
+    """
+    df = pd.read_csv(path)
+    t_data = df.iloc[:, 0].to_numpy(dtype=float)
+    h_data = df.iloc[:, 1].to_numpy(dtype=float)
+    order = np.argsort(t_data)
+    return t_data[order], h_data[order]
+
+
 def plot_full_trajectory():
     y0 = initial_state()
     t_span = (0.0, 600.0)
 
-    sol = run_trajectory(y0, t_span, method="RK45", rtol=1e-8, atol=1e-10)
+    sol = run_trajectory(y0, t_span, method="RK45", rtol=1e-8, atol=1e-10,
+                          dense_output=True)
 
     h = sol.y[0, :]
     V = sol.y[1, :]
@@ -66,10 +85,10 @@ def plot_full_trajectory():
     print(f"Real recovery point: {RECOVERY_LAT_DEG:.6f} N, {RECOVERY_LON_DEG:.6f} E")
     print(f"Distance between them: {distance / 1000.0:.2f} km")
 
-    fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
     # --- Altitude vs. time ---
-    ax = axes[0]
+    ax = axes[0, 0]
     ax.plot(t, h / 1000.0, "-", color="tab:blue")
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Altitude (km)")
@@ -77,7 +96,7 @@ def plot_full_trajectory():
     ax.grid(True, linestyle="--", alpha=0.4)
 
     # --- Ground track ---
-    ax = axes[1]
+    ax = axes[0, 1]
     ax.plot(np.degrees(lam), np.degrees(phi), "-", color="tab:blue",
              label="Model trajectory")
     ax.plot(impact_lon_deg, impact_lat_deg, "o", color="tab:red",
@@ -92,11 +111,31 @@ def plot_full_trajectory():
     ax.set_aspect("equal", adjustable="datalim")
 
     # --- Mass vs. time ---
-    ax = axes[2]
+    ax = axes[1, 0]
     ax.plot(t, M, "-", color="tab:blue")
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Mass (kg)")
     ax.set_title("Mass vs. time")
+    ax.grid(True, linestyle="--", alpha=0.4)
+
+    # --- Height validation vs. digitized Fig. 4a data (0-6 s only) ---
+    ax = axes[1, 1]
+    t_fine = np.linspace(0.0, 5.6, 300)
+    h_fine_model = sol.sol(t_fine)[0] / 1000.0  # m -> km
+    ax.plot(t_fine, h_fine_model, "-", color="tab:blue", linewidth=2,
+             label="Model")
+    try:
+        t_data, h_data = load_digitized_height(DIGITIZED_FILE)
+        ax.plot(t_data, h_data, "o", color="tab:orange", markersize=5,
+                 alpha=0.7, label="Digitized (Gardiol et al. 2021, Fig. 4a)")
+    except FileNotFoundError:
+        print(f"Note: '{DIGITIZED_FILE}' not found — skipping digitized "
+              f"overlay on the validation panel.")
+    ax.set_xlim(0.0, 6.0)
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Height (km)")
+    ax.set_title("Trajectory validation (luminous flight, 0-6 s)")
+    ax.legend(fontsize=8)
     ax.grid(True, linestyle="--", alpha=0.4)
 
     fig.tight_layout()
