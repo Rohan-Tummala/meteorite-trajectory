@@ -33,6 +33,7 @@ The experiment investigates:
     5. Error throughout the trajectory
     6. Whether manually finer stepping during luminous flight and
        coarser stepping during dark flight is effective
+    7. Computation time vs. accuracy trade-off across methods and step sizes
 
 The piecewise fixed-step experiment uses:
 
@@ -53,6 +54,7 @@ own internal timestep based primarily on rtol/atol.
 
 """
 
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
@@ -81,10 +83,7 @@ PHASE_SPLIT = 10.0  # seconds
 # Generous upper bound for dark flight.
 FULL_END = 600.0  # seconds
 
-# Fine/coarse timestep pairs.
-#
-# These are deliberately much more reasonable than 0.1/10, 0.2/20, etc.
-# while still providing a clear difference between the two phases.
+# Fine/coarse timestep pairs. Coarse = 10x fine.
 PAIRS = [
     (0.50, 5.00),
     (0.25, 2.50),
@@ -104,6 +103,9 @@ RK45_ATOL = 1e-10
 # Threshold used only to decide whether a numerical trajectory has become
 # obviously non-physical / numerically unstable.
 HEIGHT_LIMIT_KM = 1e5
+
+# Colours used consistently across the summary/time plots.
+METHOD_COLORS = {"RK2": "tab:orange", "RK4": "tab:green", "RK45": "tab:blue"}
 
 
 # ============================================================================
@@ -153,10 +155,6 @@ def run_piecewise_fixed(method, dt_fine, dt_coarse):
 
     y0 = initial_state()
 
-    # ------------------------------------------------------------------
-    # Phase 1: luminous flight
-    # ------------------------------------------------------------------
-
     phase1 = integrate_fixed_step(
         f,
         y0,
@@ -168,10 +166,6 @@ def run_piecewise_fixed(method, dt_fine, dt_coarse):
 
     y_mid = phase1["y"][:, -1]
 
-    # ------------------------------------------------------------------
-    # Phase 2: dark flight
-    # ------------------------------------------------------------------
-
     phase2 = integrate_fixed_step(
         f,
         y_mid,
@@ -181,7 +175,6 @@ def run_piecewise_fixed(method, dt_fine, dt_coarse):
         method=method,
     )
 
-    # Combine phases without duplicating PHASE_SPLIT.
     t_all = np.concatenate([
         phase1["t"],
         phase2["t"][1:],
@@ -220,10 +213,6 @@ def run_piecewise_rk45(max_step_fine, max_step_coarse):
 
     y0 = initial_state()
 
-    # ------------------------------------------------------------------
-    # Phase 1
-    # ------------------------------------------------------------------
-
     sol1 = solve_ivp(
         fun=lambda t, y: meteor_rhs(t, y, params=params),
         t_span=(0.0, PHASE_SPLIT),
@@ -235,10 +224,6 @@ def run_piecewise_rk45(max_step_fine, max_step_coarse):
     )
 
     y_mid = sol1.y[:, -1]
-
-    # ------------------------------------------------------------------
-    # Phase 2
-    # ------------------------------------------------------------------
 
     ground_impact_event.terminal = True
     ground_impact_event.direction = -1
@@ -254,7 +239,6 @@ def run_piecewise_rk45(max_step_fine, max_step_coarse):
         events=ground_impact_event,
     )
 
-    # Combine phases.
     t_all = np.concatenate([
         sol1.t,
         sol2.t[1:],
@@ -311,7 +295,6 @@ def path_is_sane(
     if not np.all(np.abs(lon_deg) <= 180):
         return False
 
-    # Height is assumed to be state index 0 and is stored in metres.
     height_km = np.abs(y_array[0, :]) / 1000.0
 
     if np.any(height_km > HEIGHT_LIMIT_KM):
@@ -345,9 +328,6 @@ def interpolate_reference(reference, t):
 def calculate_trajectory_error(t, y, reference):
     """
     Calculate trajectory/state error relative to the reference solution.
-
-    The state vector may contain several quantities with different units,
-    so this function reports component-wise absolute errors.
 
     Returns:
         errors : array with shape (n_states, n_times)
@@ -398,7 +378,8 @@ def compute_piecewise_results():
     Run the reference solution and every method/timestep combination.
 
     Results are retained even when a trajectory becomes unstable so that
-    the divergence itself can be plotted and analysed.
+    the divergence itself can be plotted and analysed. Wall-clock runtime
+    is recorded per run for the computation-time-vs-accuracy comparison.
     """
 
     print("\n" + "=" * 80)
@@ -414,38 +395,18 @@ def compute_piecewise_results():
         lat_ref = np.degrees(reference_event_y[3])
         lon_ref = np.degrees(reference_event_y[4])
 
-        print(
-            f"Reference impact time : "
-            f"{reference_impact_time:.8f} s"
-        )
-
-        print(
-            f"Reference latitude    : "
-            f"{lat_ref:.8f} deg"
-        )
-
-        print(
-            f"Reference longitude   : "
-            f"{lon_ref:.8f} deg"
-        )
+        print(f"Reference impact time : {reference_impact_time:.8f} s")
+        print(f"Reference latitude    : {lat_ref:.8f} deg")
+        print(f"Reference longitude   : {lon_ref:.8f} deg")
 
     else:
         reference_event_y = None
         reference_impact_time = None
         print("WARNING: Reference solution did not reach ground.")
 
-    # Dense reference trajectory for plotting.
-    t_reference_plot = np.linspace(
-        0,
-        reference.t[-1],
-        1000,
-    )
-
+    t_reference_plot = np.linspace(0, reference.t[-1], 1000)
     y_reference_plot = reference.sol(t_reference_plot)
-
-    height_reference_plot = (
-        y_reference_plot[0] / 1000.0
-    )
+    height_reference_plot = y_reference_plot[0] / 1000.0
 
     methods = [
         ("RK2", "fixed", "rk2"),
@@ -453,265 +414,121 @@ def compute_piecewise_results():
         ("RK45", "rk45", None),
     ]
 
-    # Matplotlib colours for timestep pairs.
-    colors = plt.cm.plasma(
-        np.linspace(
-            0,
-            0.8,
-            len(PAIRS),
-        )
-    )
+    colors = plt.cm.plasma(np.linspace(0, 0.8, len(PAIRS)))
 
     results_by_method = []
-
-    # Keep impact points for map scaling.
     all_lons = []
     all_lats = []
 
     if reference_event_y is not None:
-
-        all_lons.append(
-            np.degrees(reference_event_y[4])
-        )
-
-        all_lats.append(
-            np.degrees(reference_event_y[3])
-        )
+        all_lons.append(np.degrees(reference_event_y[4]))
+        all_lats.append(np.degrees(reference_event_y[3]))
 
     all_lons.append(RECOVERY_LON_DEG)
     all_lats.append(RECOVERY_LAT_DEG)
 
-    # ==================================================================
-    # RUN EVERY METHOD / STEP PAIR
-    # ==================================================================
-
     for label, kind, fkey in methods:
 
         entries = []
-
         phase1_entries = []
-
         raw_full = []
-
         failed = []
 
         print("\n" + "=" * 80)
         print(label)
         print("=" * 80)
 
-        for (dt_fine, dt_coarse), color in zip(
-            PAIRS,
-            colors,
-        ):
+        for (dt_fine, dt_coarse), color in zip(PAIRS, colors):
 
-            # ----------------------------------------------------------
-            # Run
-            # ----------------------------------------------------------
+            # ------------------------------------------------------
+            # Run (timed)
+            # ------------------------------------------------------
+
+            t0 = time.perf_counter()
 
             if kind == "fixed":
-
-                (
-                    t_all,
-                    y_all,
-                    event_y,
-                    t_p1,
-                    y_p1,
-                ) = run_piecewise_fixed(
-                    fkey,
-                    dt_fine,
-                    dt_coarse,
+                (t_all, y_all, event_y, t_p1, y_p1) = run_piecewise_fixed(
+                    fkey, dt_fine, dt_coarse,
                 )
-
             else:
-
-                (
-                    t_all,
-                    y_all,
-                    event_y,
-                    t_p1,
-                    y_p1,
-                ) = run_piecewise_rk45(
-                    dt_fine,
-                    dt_coarse,
+                (t_all, y_all, event_y, t_p1, y_p1) = run_piecewise_rk45(
+                    dt_fine, dt_coarse,
                 )
 
-            # ----------------------------------------------------------
-            # Save raw data
-            # ----------------------------------------------------------
+            runtime_s = time.perf_counter() - t0
 
-            phase1_entries.append(
-                (
-                    dt_fine,
-                    dt_coarse,
-                    t_p1,
-                    y_p1,
-                    color,
-                )
-            )
-
-            raw_full.append(
-                (
-                    dt_fine,
-                    dt_coarse,
-                    t_all,
-                    y_all,
-                    color,
-                )
-            )
-
-            # ----------------------------------------------------------
-            # Stability
-            # ----------------------------------------------------------
+            phase1_entries.append((dt_fine, dt_coarse, t_p1, y_p1, color))
+            raw_full.append((dt_fine, dt_coarse, t_all, y_all, color))
 
             sane = path_is_sane(y_all)
-
-            # ----------------------------------------------------------
-            # Impact
-            # ----------------------------------------------------------
-
-            impact_error = calculate_impact_error(
-                event_y,
-                reference_event_y,
-            )
-
-            # ----------------------------------------------------------
-            # Trajectory error
-            # ----------------------------------------------------------
+            impact_error = calculate_impact_error(event_y, reference_event_y)
 
             if np.all(np.isfinite(y_all)):
-
-                errors = calculate_trajectory_error(
-                    t_all,
-                    y_all,
-                    reference,
-                )
-
-                # Height is state 0.
+                errors = calculate_trajectory_error(t_all, y_all, reference)
                 height_error = errors[0, :]
-
-                max_height_error = np.nanmax(
-                    height_error
-                )
-
+                max_height_error = np.nanmax(height_error)
             else:
-
                 errors = None
                 max_height_error = np.inf
 
-            # ----------------------------------------------------------
-            # Number of computed steps
-            # ----------------------------------------------------------
-
             n_steps = len(t_all) - 1
-
-            # ----------------------------------------------------------
-            # Status
-            # ----------------------------------------------------------
 
             if event_y is None:
                 status = "NO IMPACT"
-                failed.append(
-                    (dt_fine, dt_coarse)
-                )
-
+                failed.append((dt_fine, dt_coarse))
             elif not sane:
                 status = "UNSTABLE"
-                failed.append(
-                    (dt_fine, dt_coarse)
-                )
-
+                failed.append((dt_fine, dt_coarse))
             else:
                 status = "OK"
 
-            # ----------------------------------------------------------
-            # Print result
-            # ----------------------------------------------------------
-
             if impact_error is not None:
-
                 print(
-                    f"{label:>5} "
-                    f"fine={dt_fine:<7g} "
-                    f"coarse={dt_coarse:<7g} "
-                    f"steps={n_steps:<6d} "
-                    f"impact error="
-                    f"{impact_error:10.3f} m "
-                    f"max height error="
-                    f"{max_height_error:10.3f} m "
-                    f"[{status}]"
+                    f"{label:>5} fine={dt_fine:<7g} coarse={dt_coarse:<7g} "
+                    f"steps={n_steps:<6d} runtime={runtime_s:8.5f}s "
+                    f"impact error={impact_error:10.3f} m "
+                    f"max height error={max_height_error:10.3f} m [{status}]"
                 )
-
             else:
-
                 print(
-                    f"{label:>5} "
-                    f"fine={dt_fine:<7g} "
-                    f"coarse={dt_coarse:<7g} "
-                    f"steps={n_steps:<6d} "
-                    f"impact error="
-                    f"{'N/A':>10} "
-                    f"max height error="
-                    f"{max_height_error:>10.3g} "
-                    f"[{status}]"
+                    f"{label:>5} fine={dt_fine:<7g} coarse={dt_coarse:<7g} "
+                    f"steps={n_steps:<6d} runtime={runtime_s:8.5f}s "
+                    f"impact error={'N/A':>10} "
+                    f"max height error={max_height_error:>10.3g} [{status}]"
                 )
 
-            # ----------------------------------------------------------
-            # Save successful impact
-            # ----------------------------------------------------------
-
-            if (
-                event_y is not None
-                and sane
-            ):
-
+            if event_y is not None and sane:
                 lat_i = event_y[3]
                 lon_i = event_y[4]
+                all_lons.append(np.degrees(lon_i))
+                all_lats.append(np.degrees(lat_i))
 
-                all_lons.append(
-                    np.degrees(lon_i)
-                )
+            entries.append({
+                "dt_fine": dt_fine,
+                "dt_coarse": dt_coarse,
+                "t": t_all,
+                "y": y_all,
+                "event_y": event_y,
+                "color": color,
+                "sane": sane,
+                "status": status,
+                "impact_error": impact_error,
+                "trajectory_errors": errors,
+                "max_height_error": max_height_error,
+                "n_steps": n_steps,
+                "runtime_s": runtime_s,
+            })
 
-                all_lats.append(
-                    np.degrees(lat_i)
-                )
-
-            # ----------------------------------------------------------
-            # Save complete result
-            # ----------------------------------------------------------
-
-            entries.append(
-                {
-                    "dt_fine": dt_fine,
-                    "dt_coarse": dt_coarse,
-                    "t": t_all,
-                    "y": y_all,
-                    "event_y": event_y,
-                    "color": color,
-                    "sane": sane,
-                    "status": status,
-                    "impact_error": impact_error,
-                    "trajectory_errors": errors,
-                    "max_height_error": max_height_error,
-                    "n_steps": n_steps,
-                }
-            )
-
-        results_by_method.append(
-            {
-                "label": label,
-                "entries": entries,
-                "phase1_entries": phase1_entries,
-                "raw_full": raw_full,
-                "failed": failed,
-            }
-        )
+        results_by_method.append({
+            "label": label,
+            "entries": entries,
+            "phase1_entries": phase1_entries,
+            "raw_full": raw_full,
+            "failed": failed,
+        })
 
         if failed:
-
-            print(
-                f"\n{label}: "
-                f"{len(failed)} pair(s) failed or became unstable."
-            )
+            print(f"\n{label}: {len(failed)} pair(s) failed or became unstable.")
 
     return {
         "reference": reference,
@@ -729,10 +546,7 @@ def compute_piecewise_results():
 # FIGURE 1 — FULL TRAJECTORY
 # ============================================================================
 
-def figure_piecewise_full(
-    data,
-    outlier_threshold_km=20.0,
-):
+def figure_piecewise_full(data, outlier_threshold_km=20.0):
     """
     Full trajectory comparison.
 
@@ -741,333 +555,101 @@ def figure_piecewise_full(
     scaling so that they do not hide the useful results.
     """
 
-    reference = data["reference"]
-
     t_reference_plot = data["t_reference_plot"]
-
     height_reference_plot = data["height_reference_plot"]
-
     reference_event_y = data["reference_event_y"]
-
     results_by_method = data["results_by_method"]
 
-    # --------------------------------------------------------------
-    # Determine useful map scaling
-    # --------------------------------------------------------------
-
-    scale_lons = [
-        RECOVERY_LON_DEG
-    ]
-
-    scale_lats = [
-        RECOVERY_LAT_DEG
-    ]
+    scale_lons = [RECOVERY_LON_DEG]
+    scale_lats = [RECOVERY_LAT_DEG]
 
     if reference_event_y is not None:
-
-        scale_lons.append(
-            np.degrees(reference_event_y[4])
-        )
-
-        scale_lats.append(
-            np.degrees(reference_event_y[3])
-        )
+        scale_lons.append(np.degrees(reference_event_y[4]))
+        scale_lats.append(np.degrees(reference_event_y[3]))
 
     excluded_outliers = []
 
     for method_data in results_by_method:
-
         label = method_data["label"]
-
         for entry in method_data["entries"]:
-
             event_y = entry["event_y"]
-
-            if (
-                event_y is None
-                or not entry["sane"]
-            ):
+            if event_y is None or not entry["sane"]:
                 continue
-
-            lat_i = event_y[3]
-            lon_i = event_y[4]
-
+            lat_i, lon_i = event_y[3], event_y[4]
             if reference_event_y is not None:
-
-                dist_km = (
-                    great_circle_distance(
-                        lat_i,
-                        lon_i,
-                        reference_event_y[3],
-                        reference_event_y[4],
-                    )
-                    / 1000.0
-                )
-
+                dist_km = great_circle_distance(
+                    lat_i, lon_i, reference_event_y[3], reference_event_y[4],
+                ) / 1000.0
             else:
                 dist_km = 0.0
-
             if dist_km <= outlier_threshold_km:
-
-                scale_lons.append(
-                    np.degrees(lon_i)
-                )
-
-                scale_lats.append(
-                    np.degrees(lat_i)
-                )
-
+                scale_lons.append(np.degrees(lon_i))
+                scale_lats.append(np.degrees(lat_i))
             else:
-
-                excluded_outliers.append(
-                    (
-                        label,
-                        entry["dt_fine"],
-                        entry["dt_coarse"],
-                        dist_km,
-                    )
-                )
+                excluded_outliers.append((label, entry["dt_fine"], entry["dt_coarse"], dist_km))
 
     if excluded_outliers:
-
-        print(
-            "\nPoints excluded from map-axis scaling "
-            "(still exist in the data):"
-        )
-
-        for (
-            label,
-            dt_fine,
-            dt_coarse,
-            dist_km,
-        ) in excluded_outliers:
-
-            print(
-                f"  {label} "
-                f"{dt_fine}s/{dt_coarse}s "
-                f"= {dist_km:.1f} km"
-            )
+        print("\nPoints excluded from map-axis scaling (still exist in the data):")
+        for label, dt_fine, dt_coarse, dist_km in excluded_outliers:
+            print(f"  {label} {dt_fine}s/{dt_coarse}s = {dist_km:.1f} km")
 
     lon_range = max(scale_lons) - min(scale_lons)
-
     lat_range = max(scale_lats) - min(scale_lats)
+    lon_pad = max(lon_range * 0.15, 0.005)
+    lat_pad = max(lat_range * 0.15, 0.005)
+    shared_xlim = (min(scale_lons) - lon_pad, max(scale_lons) + lon_pad)
+    shared_ylim = (min(scale_lats) - lat_pad, max(scale_lats) + lat_pad)
 
-    lon_pad = max(
-        lon_range * 0.15,
-        0.005,
-    )
+    fig, axes = plt.subplots(2, 3, figsize=(17, 10))
 
-    lat_pad = max(
-        lat_range * 0.15,
-        0.005,
-    )
-
-    shared_xlim = (
-        min(scale_lons) - lon_pad,
-        max(scale_lons) + lon_pad,
-    )
-
-    shared_ylim = (
-        min(scale_lats) - lat_pad,
-        max(scale_lats) + lat_pad,
-    )
-
-    # --------------------------------------------------------------
-    # Plot
-    # --------------------------------------------------------------
-
-    fig, axes = plt.subplots(
-        2,
-        3,
-        figsize=(17, 10),
-    )
-
-    for col, method_data in enumerate(
-        results_by_method
-    ):
-
+    for col, method_data in enumerate(results_by_method):
         label = method_data["label"]
+        ax_top, ax_bot = axes[0, col], axes[1, col]
 
-        ax_top = axes[0, col]
-
-        ax_bot = axes[1, col]
-
-        # ----------------------------------------------------------
-        # Height-time plot
-        # ----------------------------------------------------------
-
-        ax_top.plot(
-            t_reference_plot,
-            height_reference_plot,
-            "-",
-            color="black",
-            linewidth=2,
-            label="DOP853 reference",
-        )
+        ax_top.plot(t_reference_plot, height_reference_plot, "-",
+                     color="black", linewidth=2, label="DOP853 reference")
 
         for entry in method_data["entries"]:
-
             t = entry["t"]
-
             height = entry["y"][0] / 1000.0
+            pair_label = f"{entry['dt_fine']:g}s/{entry['dt_coarse']:g}s"
+            mask = np.isfinite(t) & np.isfinite(height) & (np.abs(height) < 1e5)
+            ax_top.plot(t[mask], height[mask], "o:", color=entry["color"],
+                         markersize=3, linewidth=1, label=pair_label)
 
-            dt_fine = entry["dt_fine"]
-
-            dt_coarse = entry["dt_coarse"]
-
-            color = entry["color"]
-
-            pair_label = (
-                f"{dt_fine:g}s/{dt_coarse:g}s"
-            )
-
-            # Clip only extreme numerical values from the visual
-            # plotting range. The original raw data is still retained.
-            mask = (
-                np.isfinite(t)
-                & np.isfinite(height)
-                & (np.abs(height) < 1e5)
-            )
-
-            ax_top.plot(
-                t[mask],
-                height[mask],
-                "o:",
-                color=color,
-                markersize=3,
-                linewidth=1,
-                label=pair_label,
-            )
-
-        ax_top.axvline(
-            PHASE_SPLIT,
-            color="gray",
-            linestyle="--",
-            alpha=0.5,
-            label=f"phase split ({PHASE_SPLIT:g}s)",
-        )
-
-        ax_top.set_ylim(
-            -10,
-            90,
-        )
-
-        ax_top.set_xlabel(
-            "Time (s)"
-        )
-
-        ax_top.set_ylabel(
-            "Height (km)"
-        )
-
-        ax_top.set_title(
-            f"{label}: piecewise trajectory",
-            fontsize=10,
-        )
-
-        ax_top.legend(
-            fontsize=6,
-        )
-
-        ax_top.grid(
-            True,
-            linestyle="--",
-            alpha=0.4,
-        )
-
-        # ----------------------------------------------------------
-        # Impact-location plot
-        # ----------------------------------------------------------
+        ax_top.axvline(PHASE_SPLIT, color="gray", linestyle="--", alpha=0.5,
+                         label=f"phase split ({PHASE_SPLIT:g}s)")
+        ax_top.set_ylim(-10, 90)
+        ax_top.set_xlabel("Time (s)")
+        ax_top.set_ylabel("Height (km)")
+        ax_top.set_title(f"{label}: piecewise trajectory", fontsize=10)
+        ax_top.legend(fontsize=6)
+        ax_top.grid(True, linestyle="--", alpha=0.4)
 
         if reference_event_y is not None:
-
-            ax_bot.plot(
-                np.degrees(
-                    reference_event_y[4]
-                ),
-                np.degrees(
-                    reference_event_y[3]
-                ),
-                "o",
-                color="black",
-                markersize=12,
-                label="DOP853 reference",
-                zorder=5,
-            )
-
-        ax_bot.plot(
-            RECOVERY_LON_DEG,
-            RECOVERY_LAT_DEG,
-            "*",
-            color="tab:green",
-            markersize=16,
-            label="Real recovery",
-            zorder=5,
-        )
+            ax_bot.plot(np.degrees(reference_event_y[4]), np.degrees(reference_event_y[3]),
+                         "o", color="black", markersize=12, label="DOP853 reference", zorder=5)
+        ax_bot.plot(RECOVERY_LON_DEG, RECOVERY_LAT_DEG, "*", color="tab:green",
+                     markersize=16, label="Real recovery", zorder=5)
 
         for entry in method_data["entries"]:
-
             event_y = entry["event_y"]
-
             if event_y is None:
                 continue
+            pair_label = f"{entry['dt_fine']:g}s/{entry['dt_coarse']:g}s"
+            ax_bot.plot(np.degrees(event_y[4]), np.degrees(event_y[3]), "o",
+                         color=entry["color"], markersize=8, label=pair_label)
 
-            lat_i = event_y[3]
+        ax_bot.set_xlim(*shared_xlim)
+        ax_bot.set_ylim(*shared_ylim)
+        ax_bot.set_xlabel("Longitude (deg E)")
+        ax_bot.set_ylabel("Latitude (deg N)")
+        ax_bot.set_title(f"{label}: impact location", fontsize=9)
+        ax_bot.legend(fontsize=6)
+        ax_bot.grid(True, linestyle="--", alpha=0.4)
 
-            lon_i = event_y[4]
-
-            pair_label = (
-                f"{entry['dt_fine']:g}s/"
-                f"{entry['dt_coarse']:g}s"
-            )
-
-            ax_bot.plot(
-                np.degrees(lon_i),
-                np.degrees(lat_i),
-                "o",
-                color=entry["color"],
-                markersize=8,
-                label=pair_label,
-            )
-
-        ax_bot.set_xlim(
-            *shared_xlim
-        )
-
-        ax_bot.set_ylim(
-            *shared_ylim
-        )
-
-        ax_bot.set_xlabel(
-            "Longitude (deg E)"
-        )
-
-        ax_bot.set_ylabel(
-            "Latitude (deg N)"
-        )
-
-        ax_bot.set_title(
-            f"{label}: impact location",
-            fontsize=9,
-        )
-
-        ax_bot.legend(
-            fontsize=6,
-        )
-
-        ax_bot.grid(
-            True,
-            linestyle="--",
-            alpha=0.4,
-        )
-
-    fig.suptitle(
-        "Piecewise stepping — full trajectory comparison",
-        fontsize=14,
-    )
-
+    fig.suptitle("Piecewise stepping — full trajectory comparison", fontsize=14)
     fig.tight_layout()
-
     plt.show()
 
 
@@ -1075,10 +657,7 @@ def figure_piecewise_full(
 # FIGURE 2 — LUMINOUS PHASE
 # ============================================================================
 
-def figure_piecewise_luminous_zoom(
-    data,
-    zoom_end=12.0,
-):
+def figure_piecewise_luminous_zoom(data, zoom_end=12.0):
     """
     Detailed view of the luminous / rapidly changing region.
 
@@ -1087,126 +666,38 @@ def figure_piecewise_luminous_zoom(
     """
 
     results_by_method = data["results_by_method"]
-
-    t_reference = np.linspace(
-        0,
-        zoom_end,
-        500,
-    )
-
     reference = data["reference"]
 
-    y_reference = reference.sol(
-        t_reference
-    )
+    t_reference = np.linspace(0, zoom_end, 500)
+    h_reference = reference.sol(t_reference)[0] / 1000.0
 
-    h_reference = (
-        y_reference[0] / 1000.0
-    )
+    fig, axes = plt.subplots(1, 3, figsize=(17, 5.5))
 
-    fig, axes = plt.subplots(
-        1,
-        3,
-        figsize=(17, 5.5),
-    )
-
-    for col, method_data in enumerate(
-        results_by_method
-    ):
-
+    for col, method_data in enumerate(results_by_method):
         label = method_data["label"]
-
         ax = axes[col]
+        ax.plot(t_reference, h_reference, "-", color="black", linewidth=2,
+                 label="DOP853 reference")
 
-        ax.plot(
-            t_reference,
-            h_reference,
-            "-",
-            color="black",
-            linewidth=2,
-            label="DOP853 reference",
-        )
+        for dt_fine, dt_coarse, t_p1, y_p1, color in method_data["phase1_entries"]:
+            height = y_p1[0] / 1000.0
+            mask = (t_p1 <= zoom_end) & np.isfinite(height)
+            pair_label = f"{dt_fine:g}s/{dt_coarse:g}s"
+            ax.plot(t_p1[mask], height[mask], "o:", color=color,
+                     markersize=4, linewidth=1.2, label=pair_label)
 
-        for (
-            dt_fine,
-            dt_coarse,
-            t_p1,
-            y_p1,
-            color,
-        ) in method_data["phase1_entries"]:
+        ax.axvline(PHASE_SPLIT, color="gray", linestyle="--", alpha=0.5,
+                    label=f"phase split ({PHASE_SPLIT:g}s)")
+        ax.set_xlim(0, zoom_end)
+        ax.set_ylim(-10, 90)
+        ax.set_xlabel("Time (s)")
+        ax.set_ylabel("Height (km)")
+        ax.set_title(f"{label}: luminous-phase detail", fontsize=9)
+        ax.legend(fontsize=7)
+        ax.grid(True, linestyle="--", alpha=0.4)
 
-            height = (
-                y_p1[0] / 1000.0
-            )
-
-            mask = (
-                (t_p1 <= zoom_end)
-                & np.isfinite(height)
-            )
-
-            pair_label = (
-                f"{dt_fine:g}s/"
-                f"{dt_coarse:g}s"
-            )
-
-            ax.plot(
-                t_p1[mask],
-                height[mask],
-                "o:",
-                color=color,
-                markersize=4,
-                linewidth=1.2,
-                label=pair_label,
-            )
-
-        ax.axvline(
-            PHASE_SPLIT,
-            color="gray",
-            linestyle="--",
-            alpha=0.5,
-            label=f"phase split ({PHASE_SPLIT:g}s)",
-        )
-
-        ax.set_xlim(
-            0,
-            zoom_end,
-        )
-
-        ax.set_ylim(
-            -10,
-            90,
-        )
-
-        ax.set_xlabel(
-            "Time (s)"
-        )
-
-        ax.set_ylabel(
-            "Height (km)"
-        )
-
-        ax.set_title(
-            f"{label}: luminous-phase detail",
-            fontsize=9,
-        )
-
-        ax.legend(
-            fontsize=7,
-        )
-
-        ax.grid(
-            True,
-            linestyle="--",
-            alpha=0.4,
-        )
-
-    fig.suptitle(
-        "Fine-step behaviour during luminous flight",
-        fontsize=13,
-    )
-
+    fig.suptitle("Fine-step behaviour during luminous flight", fontsize=13)
     fig.tight_layout()
-
     plt.show()
 
 
@@ -1214,11 +705,7 @@ def figure_piecewise_luminous_zoom(
 # FIGURE 3 — DARK PHASE
 # ============================================================================
 
-def figure_piecewise_dark_zoom(
-    data,
-    zoom_start=None,
-    zoom_end=None,
-):
+def figure_piecewise_dark_zoom(data, zoom_start=None, zoom_end=None):
     """
     Detailed view of the dark-flight phase.
 
@@ -1230,131 +717,41 @@ def figure_piecewise_dark_zoom(
         zoom_start = PHASE_SPLIT
 
     reference = data["reference"]
-
     if zoom_end is None:
         zoom_end = reference.t[-1]
 
     results_by_method = data["results_by_method"]
 
-    t_reference = np.linspace(
-        zoom_start,
-        zoom_end,
-        700,
-    )
+    t_reference = np.linspace(zoom_start, zoom_end, 700)
+    h_reference = reference.sol(t_reference)[0] / 1000.0
 
-    y_reference = reference.sol(
-        t_reference
-    )
+    fig, axes = plt.subplots(1, 3, figsize=(17, 5.5))
 
-    h_reference = (
-        y_reference[0] / 1000.0
-    )
-
-    fig, axes = plt.subplots(
-        1,
-        3,
-        figsize=(17, 5.5),
-    )
-
-    for col, method_data in enumerate(
-        results_by_method
-    ):
-
+    for col, method_data in enumerate(results_by_method):
         label = method_data["label"]
-
         ax = axes[col]
+        ax.plot(t_reference, h_reference, "-", color="black", linewidth=2,
+                 label="DOP853 reference")
 
-        ax.plot(
-            t_reference,
-            h_reference,
-            "-",
-            color="black",
-            linewidth=2,
-            label="DOP853 reference",
-        )
+        for dt_fine, dt_coarse, t_all, y_all, color in method_data["raw_full"]:
+            height = y_all[0] / 1000.0
+            mask = ((t_all >= zoom_start) & (t_all <= zoom_end)
+                     & np.isfinite(t_all) & np.isfinite(height) & (np.abs(height) < 1e5))
+            pair_label = f"{dt_fine:g}s/{dt_coarse:g}s"
+            ax.plot(t_all[mask], height[mask], "o:", color=color,
+                     markersize=5, linewidth=1.2, label=pair_label)
 
-        for (
-            dt_fine,
-            dt_coarse,
-            t_all,
-            y_all,
-            color,
-        ) in method_data["raw_full"]:
+        ax.axvline(PHASE_SPLIT, color="gray", linestyle="--", alpha=0.5)
+        ax.set_xlim(zoom_start, zoom_end)
+        ax.set_ylim(-10, 90)
+        ax.set_xlabel("Time (s)")
+        ax.set_ylabel("Height (km)")
+        ax.set_title(f"{label}: dark-flight behaviour", fontsize=9)
+        ax.legend(fontsize=7)
+        ax.grid(True, linestyle="--", alpha=0.4)
 
-            height = (
-                y_all[0] / 1000.0
-            )
-
-            mask = (
-                (t_all >= zoom_start)
-                & (t_all <= zoom_end)
-                & np.isfinite(t_all)
-                & np.isfinite(height)
-                & (np.abs(height) < 1e5)
-            )
-
-            pair_label = (
-                f"{dt_fine:g}s/"
-                f"{dt_coarse:g}s"
-            )
-
-            ax.plot(
-                t_all[mask],
-                height[mask],
-                "o:",
-                color=color,
-                markersize=5,
-                linewidth=1.2,
-                label=pair_label,
-            )
-
-        ax.axvline(
-            PHASE_SPLIT,
-            color="gray",
-            linestyle="--",
-            alpha=0.5,
-        )
-
-        ax.set_xlim(
-            zoom_start,
-            zoom_end,
-        )
-
-        ax.set_ylim(
-            -10,
-            90,
-        )
-
-        ax.set_xlabel(
-            "Time (s)"
-        )
-
-        ax.set_ylabel(
-            "Height (km)"
-        )
-
-        ax.set_title(
-            f"{label}: dark-flight behaviour",
-            fontsize=9,
-        )
-
-        ax.legend(
-            fontsize=7,
-        )
-
-        ax.grid(
-            True,
-            linestyle="--",
-            alpha=0.4,
-        )
-
-    fig.suptitle(
-        "Coarse-step behaviour during dark flight",
-        fontsize=13,
-    )
-
+    fig.suptitle("Coarse-step behaviour during dark flight", fontsize=13)
     fig.tight_layout()
-
     plt.show()
 
 
@@ -1365,90 +762,37 @@ def figure_piecewise_dark_zoom(
 def figure_impact_error(data):
     """
     Plot impact-location error against coarse timestep.
-
-    This is one of the most important quantitative comparisons for the
-    meteor landing-location problem.
     """
 
     results_by_method = data["results_by_method"]
-
-    fig, ax = plt.subplots(
-        figsize=(9, 6)
-    )
+    fig, ax = plt.subplots(figsize=(9, 6))
 
     for method_data in results_by_method:
-
         label = method_data["label"]
-
-        dt_values = []
-
-        errors = []
+        dt_values, errors = [], []
 
         for entry in method_data["entries"]:
-
-            if entry["impact_error"] is None:
+            if entry["impact_error"] is None or not np.isfinite(entry["impact_error"]):
                 continue
-
-            if not np.isfinite(
-                entry["impact_error"]
-            ):
-                continue
-
-            dt_values.append(
-                entry["dt_coarse"]
-            )
-
-            errors.append(
-                entry["impact_error"]
-            )
+            dt_values.append(entry["dt_coarse"])
+            errors.append(entry["impact_error"])
 
         if len(dt_values) == 0:
             continue
 
-        order = np.argsort(
-            dt_values
-        )
+        order = np.argsort(dt_values)
+        dt_values = np.array(dt_values)[order]
+        errors = np.array(errors)[order]
 
-        dt_values = np.array(
-            dt_values
-        )[order]
+        ax.loglog(dt_values, errors, "o-", linewidth=1.5, markersize=7,
+                   color=METHOD_COLORS.get(label), label=label)
 
-        errors = np.array(
-            errors
-        )[order]
-
-        ax.loglog(
-            dt_values,
-            errors,
-            "o-",
-            linewidth=1.5,
-            markersize=7,
-            label=label,
-        )
-
-    ax.set_xlabel(
-        "Dark-flight timestep (s)"
-    )
-
-    ax.set_ylabel(
-        "Impact-location error (m)"
-    )
-
-    ax.set_title(
-        "Impact-location error vs coarse timestep"
-    )
-
-    ax.grid(
-        True,
-        which="both",
-        linestyle="--",
-        alpha=0.4,
-    )
-
+    ax.set_xlabel("Dark-flight timestep (s)")
+    ax.set_ylabel("Impact-location error (m)")
+    ax.set_title("Impact-location error vs coarse timestep")
+    ax.grid(True, which="both", linestyle="--", alpha=0.4)
     ax.legend()
-
     plt.tight_layout()
-
     plt.show()
 
 
@@ -1462,83 +806,35 @@ def figure_height_error(data):
     """
 
     results_by_method = data["results_by_method"]
-
-    fig, ax = plt.subplots(
-        figsize=(9, 6)
-    )
+    fig, ax = plt.subplots(figsize=(9, 6))
 
     for method_data in results_by_method:
-
         label = method_data["label"]
-
-        dt_values = []
-
-        errors = []
+        dt_values, errors = [], []
 
         for entry in method_data["entries"]:
-
-            error = entry[
-                "max_height_error"
-            ]
-
+            error = entry["max_height_error"]
             if not np.isfinite(error):
                 continue
-
-            dt_values.append(
-                entry["dt_coarse"]
-            )
-
-            errors.append(
-                error
-            )
+            dt_values.append(entry["dt_coarse"])
+            errors.append(error)
 
         if len(dt_values) == 0:
             continue
 
-        order = np.argsort(
-            dt_values
-        )
+        order = np.argsort(dt_values)
+        dt_values = np.array(dt_values)[order]
+        errors = np.array(errors)[order]
 
-        dt_values = np.array(
-            dt_values
-        )[order]
+        ax.loglog(dt_values, errors, "o-", linewidth=1.5, markersize=7,
+                   color=METHOD_COLORS.get(label), label=label)
 
-        errors = np.array(
-            errors
-        )[order]
-
-        ax.loglog(
-            dt_values,
-            errors,
-            "o-",
-            linewidth=1.5,
-            markersize=7,
-            label=label,
-        )
-
-    ax.set_xlabel(
-        "Dark-flight timestep (s)"
-    )
-
-    ax.set_ylabel(
-        "Maximum height error (m)"
-    )
-
-    ax.set_title(
-        "Maximum trajectory height error vs timestep"
-    )
-
-    ax.grid(
-        True,
-        which="both",
-        linestyle="--",
-        alpha=0.4,
-    )
-
+    ax.set_xlabel("Dark-flight timestep (s)")
+    ax.set_ylabel("Maximum height error (m)")
+    ax.set_title("Maximum trajectory height error vs timestep")
+    ax.grid(True, which="both", linestyle="--", alpha=0.4)
     ax.legend()
-
     plt.tight_layout()
-
     plt.show()
 
 
@@ -1546,101 +842,100 @@ def figure_height_error(data):
 # FIGURE 6 — TRAJECTORY ERROR OVER TIME
 # ============================================================================
 
-def figure_trajectory_error(
-    data,
-    method_name="RK2",
-):
+def figure_trajectory_error(data, method_name="RK2"):
     """
     Show how height error develops throughout the trajectory.
-
-    This is useful for identifying exactly when a numerical solution
-    starts departing from the reference solution.
     """
 
     method_data = None
-
     for candidate in data["results_by_method"]:
-
         if candidate["label"] == method_name:
             method_data = candidate
             break
 
     if method_data is None:
-        print(
-            f"Method {method_name} not found."
-        )
+        print(f"Method {method_name} not found.")
         return
 
-    fig, ax = plt.subplots(
-        figsize=(10, 6)
-    )
+    fig, ax = plt.subplots(figsize=(10, 6))
 
     for entry in method_data["entries"]:
-
-        errors = entry[
-            "trajectory_errors"
-        ]
-
+        errors = entry["trajectory_errors"]
         if errors is None:
             continue
-
         t = entry["t"]
-
         height_error = errors[0, :]
+        mask = np.isfinite(t) & np.isfinite(height_error) & (height_error > 0)
+        pair_label = f"{entry['dt_fine']:g}s/{entry['dt_coarse']:g}s"
+        ax.semilogy(t[mask], height_error[mask], "o-", markersize=2.5,
+                     linewidth=1, label=pair_label)
 
-        mask = (
-            np.isfinite(t)
-            & np.isfinite(height_error)
-            & (height_error > 0)
-        )
-
-        pair_label = (
-            f"{entry['dt_fine']:g}s/"
-            f"{entry['dt_coarse']:g}s"
-        )
-
-        ax.semilogy(
-            t[mask],
-            height_error[mask],
-            "o-",
-            markersize=2.5,
-            linewidth=1,
-            label=pair_label,
-        )
-
-    ax.axvline(
-        PHASE_SPLIT,
-        color="gray",
-        linestyle="--",
-        alpha=0.5,
-        label="phase split",
-    )
-
-    ax.set_xlabel(
-        "Time (s)"
-    )
-
-    ax.set_ylabel(
-        "Absolute height error (m)"
-    )
-
-    ax.set_title(
-        f"{method_name}: height error relative to DOP853 reference"
-    )
-
-    ax.grid(
-        True,
-        which="both",
-        linestyle="--",
-        alpha=0.4,
-    )
-
-    ax.legend(
-        fontsize=7
-    )
-
+    ax.axvline(PHASE_SPLIT, color="gray", linestyle="--", alpha=0.5, label="phase split")
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Absolute height error (m)")
+    ax.set_title(f"{method_name}: height error relative to DOP853 reference")
+    ax.grid(True, which="both", linestyle="--", alpha=0.4)
+    ax.legend(fontsize=7)
     plt.tight_layout()
+    plt.show()
 
+
+# ============================================================================
+# FIGURE 7 — COMPUTATION TIME VS ACCURACY
+# ============================================================================
+
+def figure_computation_time(data):
+    """
+    Plot computation time vs. accuracy (both impact-location error and
+    max height error), log-log, one line per method, one point per
+    (fine, coarse) step-size pair. This is the accuracy-vs-cost trade-off
+    plot, using actual wall-clock runtime as the cost axis (as opposed
+    to step count or function-evaluation count).
+    """
+
+    results_by_method = data["results_by_method"]
+    fig, axes = plt.subplots(1, 2, figsize=(13, 6))
+
+    for method_data in results_by_method:
+        label = method_data["label"]
+        color = METHOD_COLORS.get(label, "gray")
+
+        rows = [
+            (entry["runtime_s"], entry["impact_error"], entry["max_height_error"],
+             entry["dt_fine"], entry["dt_coarse"])
+            for entry in method_data["entries"]
+            if entry["status"] == "OK" and entry["impact_error"] is not None
+        ]
+        if not rows:
+            continue
+
+        rows.sort(key=lambda r: r[0])
+        times = [r[0] for r in rows]
+        impact_errs = [r[1] for r in rows]
+        height_errs = [r[2] for r in rows]
+        dt_coarses = [r[4] for r in rows]
+
+        axes[0].loglog(times, impact_errs, "o-", color=color, markersize=7, label=label)
+        axes[1].loglog(times, height_errs, "o-", color=color, markersize=7, label=label)
+
+        for t_val, err_val, dt_coarse in zip(times, impact_errs, dt_coarses):
+            axes[0].annotate(f"{dt_coarse:g}s", (t_val, err_val), fontsize=6,
+                               xytext=(4, 4), textcoords="offset points", alpha=0.7)
+
+    axes[0].set_xlabel("Computation time (s)")
+    axes[0].set_ylabel("Impact-location error vs. reference (m)")
+    axes[0].set_title("Runtime vs. impact-location error")
+    axes[0].grid(True, which="both", linestyle="--", alpha=0.4)
+    axes[0].legend()
+
+    axes[1].set_xlabel("Computation time (s)")
+    axes[1].set_ylabel("Max height error vs. reference (m)")
+    axes[1].set_title("Runtime vs. max height error")
+    axes[1].grid(True, which="both", linestyle="--", alpha=0.4)
+    axes[1].legend()
+
+    fig.suptitle("Computation time vs. accuracy, by method and step size", fontsize=13)
+    fig.tight_layout()
     plt.show()
 
 
@@ -1654,65 +949,32 @@ def print_summary(data):
     """
 
     print("\n")
-    print("=" * 110)
+    print("=" * 125)
     print("SUMMARY")
-    print("=" * 110)
+    print("=" * 125)
 
     print(
-        f"{'Method':<8}"
-        f"{'Fine':>10}"
-        f"{'Coarse':>10}"
-        f"{'Steps':>10}"
-        f"{'Impact error (m)':>20}"
-        f"{'Max height error (m)':>24}"
-        f"{'Status':>15}"
+        f"{'Method':<8}{'Fine':>10}{'Coarse':>10}{'Steps':>10}{'Runtime (s)':>14}"
+        f"{'Impact error (m)':>20}{'Max height error (m)':>24}{'Status':>15}"
     )
+    print("-" * 125)
 
-    print("-" * 110)
-
-    for method_data in data[
-        "results_by_method"
-    ]:
-
+    for method_data in data["results_by_method"]:
         label = method_data["label"]
-
         for entry in method_data["entries"]:
+            impact_error = entry["impact_error"]
+            max_height_error = entry["max_height_error"]
 
-            impact_error = entry[
-                "impact_error"
-            ]
-
-            max_height_error = entry[
-                "max_height_error"
-            ]
-
-            if impact_error is None:
-                impact_string = "N/A"
-            else:
-                impact_string = (
-                    f"{impact_error:.4f}"
-                )
-
-            if np.isfinite(
-                max_height_error
-            ):
-                height_string = (
-                    f"{max_height_error:.4f}"
-                )
-            else:
-                height_string = "INF"
+            impact_string = "N/A" if impact_error is None else f"{impact_error:.4f}"
+            height_string = f"{max_height_error:.4f}" if np.isfinite(max_height_error) else "INF"
 
             print(
-                f"{label:<8}"
-                f"{entry['dt_fine']:>10g}"
-                f"{entry['dt_coarse']:>10g}"
-                f"{entry['n_steps']:>10d}"
-                f"{impact_string:>20}"
-                f"{height_string:>24}"
-                f"{entry['status']:>15}"
+                f"{label:<8}{entry['dt_fine']:>10g}{entry['dt_coarse']:>10g}"
+                f"{entry['n_steps']:>10d}{entry['runtime_s']:>14.5f}"
+                f"{impact_string:>20}{height_string:>24}{entry['status']:>15}"
             )
 
-    print("=" * 110)
+    print("=" * 125)
 
 
 # ============================================================================
@@ -1728,72 +990,23 @@ if __name__ == "__main__":
         "==============================================================\n"
     )
 
-    print(
-        f"Phase split: {PHASE_SPLIT:g} s"
-    )
-
-    print(
-        f"Simulation end: {FULL_END:g} s"
-    )
-
-    print(
-        "Timestep pairs:"
-    )
-
+    print(f"Phase split: {PHASE_SPLIT:g} s")
+    print(f"Simulation end: {FULL_END:g} s")
+    print("Timestep pairs:")
     for fine, coarse in PAIRS:
-
-        print(
-            f"    {fine:g} s / {coarse:g} s"
-        )
-
-    print(
-        "\nReference: DOP853 with tight tolerances"
-    )
-
-    # --------------------------------------------------------------
-    # Run all simulations
-    # --------------------------------------------------------------
+        print(f"    {fine:g} s / {coarse:g} s")
+    print("\nReference: DOP853 with tight tolerances")
 
     data = compute_piecewise_results()
 
-    # --------------------------------------------------------------
-    # Print quantitative summary
-    # --------------------------------------------------------------
-
     print_summary(data)
 
-    # --------------------------------------------------------------
-    # Figures
-    # --------------------------------------------------------------
+    figure_piecewise_full(data)
+    figure_piecewise_luminous_zoom(data)
+    figure_piecewise_dark_zoom(data)
+    figure_impact_error(data)
+    figure_height_error(data)
+    figure_computation_time(data)
 
-    figure_piecewise_full(
-        data
-    )
-
-    figure_piecewise_luminous_zoom(
-        data
-    )
-
-    figure_piecewise_dark_zoom(
-        data
-    )
-
-    figure_impact_error(
-        data
-    )
-
-    figure_height_error(
-        data
-    )
-
-    # RK2 error evolution
-    figure_trajectory_error(
-        data,
-        method_name="RK2",
-    )
-
-    # RK4 error evolution
-    figure_trajectory_error(
-        data,
-        method_name="RK4",
-    )
+    figure_trajectory_error(data, method_name="RK2")
+    figure_trajectory_error(data, method_name="RK4")
