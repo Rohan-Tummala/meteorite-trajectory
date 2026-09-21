@@ -72,7 +72,7 @@ LAMBDA0_UNC = np.radians(7.0 / 3600.0)
 # paper's own beginning/end coordinates: lat and lon both increase
 # (bearing ~58 deg, ENE), matching 238.1 - 180 = 58.1 deg, not 238.1
 # deg directly. The dynamics.py equations need the travel heading,
-# so we apply the 180-degree correction here.
+# so the 180-degree correction is applied here.
 PSI0 = np.radians(238.1 - 180.0)
 PSI0_UNC = np.radians(0.2)
 
@@ -144,8 +144,8 @@ RECOVERY_LON = np.radians(RECOVERY_LON_DEG)
 RHO_M = 3322.0
 
 # Ablation coefficient, s^2/km^2 (paper's own fitted value — useful as
-# an independent cross-check, NOT a direct input to CH/Q in our model,
-# since it's defined differently; see Ceplecha 1987 formulation)
+# an independent cross-check, NOT a direct input to CH/Q in this
+# model, since it's defined differently; see Ceplecha 1987 formulation)
 ABLATION_COEFF_PAPER = 0.012
 ABLATION_COEFF_PAPER_UNC = 0.003
 
