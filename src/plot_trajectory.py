@@ -23,7 +23,7 @@ from cavezzo import initial_state, RECOVERY_LAT, RECOVERY_LON, \
     RECOVERY_LAT_DEG, RECOVERY_LON_DEG
 
 # Digitized reference points from Fig. 4a of Gardiol et al. (2021),
-# via WebPlotDigitizer. Update this path if your filename differs.
+# via WebPlotDigitizer. Update this path if the filename differs.
 DIGITIZED_FILE = "cavezzo_height_vs_time.csv"
 
 
@@ -145,8 +145,8 @@ def plot_full_trajectory():
 
 
 # Digitized reference points from Fig. 4c of Gardiol et al. (2021),
-# via WebPlotDigitizer. Update this path if your filename differs.
-DIGITIZED_VELOCITY_FILE = "cavezzo_vel_vs_time.csv"
+# via WebPlotDigitizer. Update this path if the filename differs.
+DIGITIZED_VELOCITY_FILE = "cavezzo_vel_vs_time.xlsx"
 
 
 def load_digitized_velocity(path):
