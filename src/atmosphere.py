@@ -11,8 +11,8 @@ Two interchangeable density models are provided:
 Both take altitude in metres and return density in kg/m^3, so they
 can be swapped without changing any calling code (e.g. dynamics.py).
 
-Use the top-level `density(h, model)` dispatcher from your main code
-to select which one is active, e.g.:
+The top-level `density(h, model)` dispatcher should be used to select
+which one is active, e.g.:
 
     from atmosphere import density
     rho = density(h, model="table")   # or model="exp"
@@ -56,9 +56,9 @@ def exponential_density(h):
 # COESA 1976 Standard Atmosphere (analytic, piecewise)
 # ---------------------------------------------------------------------
 # This is the actual defining model behind every "standard atmosphere"
-# table you'll find in a textbook — tables are just sampled points from
+# table found in textbooks — tables are just sampled points from
 # these equations. Implementing it directly avoids transcription error
-# and lets us sample it at any resolution we want to build the
+# and allows sampling at any resolution needed to build the
 # interpolation table below, rather than relying on someone else's
 # rounded, fixed-resolution table.
 #
