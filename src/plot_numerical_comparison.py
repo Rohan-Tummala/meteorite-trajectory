@@ -208,12 +208,10 @@ def figure_A():
 def figure_B():
     print("\n=== Figure B: per-method step-size convergence grid ===")
 
-    truth_zoom = run_truth(t_span=ZOOM_SPAN)
-    t_zoom_fine = np.linspace(*ZOOM_SPAN, 400)
-    h_truth_zoom = truth_zoom.sol(t_zoom_fine)[0] / 1000.0
-
     truth_full = run_truth(t_span=FULL_SPAN)
     lat_truth, lon_truth = impact_latlon_solveivp(truth_full)
+    t_truth_fine = np.linspace(0, truth_full.t[-1], 600)
+    h_truth_full = truth_full.sol(t_truth_fine)[0] / 1000.0
 
     fig, axes = plt.subplots(2, 3, figsize=(16, 10))
     colors = plt.cm.viridis(np.linspace(0, 0.9, len(STEP_SIZES)))
@@ -224,77 +222,93 @@ def figure_B():
         ("RK45", None, "adaptive_capped"),
     ]
 
-    for col, (label, fkey, kind) in enumerate(methods):
+    # --- Pass 1: run everything once (full span only — reused for both
+    # the top-row altitude curve and the bottom-row impact point), and
+    # collect the sane impact points so we can set shared axis limits
+    # across all three bottom panels before plotting anything. ---
+    results_by_col = []
+    all_impact_lons, all_impact_lats = [], []
+
+    for label, fkey, kind in methods:
+        diverged = []
+        entries = []  # (dt, t_array, h_array_km, lat_i, lon_i, color)
+
+        for dt, color in zip(STEP_SIZES, colors):
+            if kind == "fixed":
+                res = run_fixed(fkey, dt=dt, t_span=FULL_SPAN)
+                t_arr, h_arr = res["t"], res["y"][0] / 1000.0
+                lat_i, lon_i = impact_latlon_fixed(res)
+                path_ok = path_is_sane(res["y"]) if lat_i is not None else False
+            else:
+                sol = run_rk45_capped(max_step=dt, t_span=FULL_SPAN)
+                t_arr = np.linspace(0, sol.t[-1], 400)
+                h_arr = sol.sol(t_arr)[0] / 1000.0
+                lat_i, lon_i = impact_latlon_solveivp(sol)
+                path_ok = path_is_sane(sol.y) if lat_i is not None else False
+
+            if lat_i is None or not path_ok:
+                diverged.append(dt)
+                continue
+
+            err_from_truth = great_circle_distance(lat_i, lon_i, lat_truth, lon_truth)
+            print(f"{label:>5} dt={dt:>5}: impact offset from truth = {err_from_truth:8.2f} m")
+            entries.append((dt, t_arr, h_arr, lat_i, lon_i, color))
+            all_impact_lons.append(np.degrees(lon_i))
+            all_impact_lats.append(np.degrees(lat_i))
+
+        results_by_col.append((label, kind, entries, diverged))
+        if diverged:
+            print(f"{label}: dt={diverged} produced an unstable path (or no impact) — omitted.")
+
+    # Shared bottom-row axis limits, covering every sane impact point
+    # across all three methods, plus truth and the real recovery site,
+    # with a little padding so markers aren't clipped at the edge.
+    all_impact_lons += [np.degrees(lon_truth), RECOVERY_LON_DEG]
+    all_impact_lats += [np.degrees(lat_truth), RECOVERY_LAT_DEG]
+    lon_min, lon_max = min(all_impact_lons), max(all_impact_lons)
+    lat_min, lat_max = min(all_impact_lats), max(all_impact_lats)
+    lon_pad = max((lon_max - lon_min) * 0.1, 0.001)
+    lat_pad = max((lat_max - lat_min) * 0.1, 0.001)
+    shared_xlim = (lon_min - lon_pad, lon_max + lon_pad)
+    shared_ylim = (lat_min - lat_pad, lat_max + lat_pad)
+
+    # --- Pass 2: plot, now that shared bottom-row limits are known. ---
+    for col, (label, kind, entries, diverged) in enumerate(results_by_col):
         ax_top = axes[0, col]
         ax_bot = axes[1, col]
 
-        ax_top.plot(t_zoom_fine, h_truth_zoom, "-", color="black", linewidth=2.5, label="Truth")
+        ax_top.plot(t_truth_fine, h_truth_full, "-", color="black", linewidth=2, label="Truth")
         ax_bot.plot(np.degrees(lon_truth), np.degrees(lat_truth), "o", color="black",
                      markersize=12, label="Truth", zorder=5)
         ax_bot.plot(RECOVERY_LON_DEG, RECOVERY_LAT_DEG, "*", color="tab:green",
                      markersize=16, label="Real recovery", zorder=5)
 
-        diverged_zoom = []
-        diverged_full = []
-
-        for dt, color in zip(STEP_SIZES, colors):
-            # Top row: zoomed altitude curve at this step size
-            if kind == "fixed":
-                res_zoom = run_fixed(fkey, dt=dt, t_span=ZOOM_SPAN)
-                h_vals = res_zoom["y"][0] / 1000.0
-                if np.any(np.abs(h_vals) > 200):
-                    diverged_zoom.append(dt)
-                else:
-                    ax_top.plot(res_zoom["t"], h_vals, "-", color=color,
-                                 linewidth=1.2, label=f"dt={dt}s")
-            else:  # RK45, capped
-                sol_zoom = run_rk45_capped(max_step=dt, t_span=ZOOM_SPAN)
-                h_vals = sol_zoom.sol(t_zoom_fine)[0] / 1000.0
-                ax_top.plot(t_zoom_fine, h_vals, "-", color=color,
-                             linewidth=1.2, label=f"max_step={dt}s")
-
-            # Bottom row: full-trajectory impact location at this step size
-            if kind == "fixed":
-                res_full = run_fixed(fkey, dt=dt, t_span=FULL_SPAN)
-                lat_i, lon_i = impact_latlon_fixed(res_full)
-                path_ok = path_is_sane(res_full["y"]) if lat_i is not None else False
-            else:
-                sol_full = run_rk45_capped(max_step=dt, t_span=FULL_SPAN)
-                lat_i, lon_i = impact_latlon_solveivp(sol_full)
-                path_ok = path_is_sane(sol_full.y) if lat_i is not None else False
-
-            if lat_i is None or not path_ok:
-                diverged_full.append(dt)
-                continue
-            err_from_truth = great_circle_distance(lat_i, lon_i, lat_truth, lon_truth)
-            print(f"{label:>5} dt={dt:>5}: impact offset from truth = {err_from_truth:8.2f} m")
+        for dt, t_arr, h_arr, lat_i, lon_i, color in entries:
+            step_label = f"dt={dt}s" if kind == "fixed" else f"max_step={dt}s"
+            ax_top.plot(t_arr, h_arr, "-", color=color, linewidth=1.2, label=step_label)
             ax_bot.plot(np.degrees(lon_i), np.degrees(lat_i), "o", color=color,
-                         markersize=7, label=f"dt={dt}s" if kind == "fixed" else f"max_step={dt}s")
+                         markersize=7, label=step_label)
 
-        ax_top.set_xlim(*ZOOM_SPAN)
         ax_top.set_ylim(-10, 90)
         ax_top.set_xlabel("Time (s)")
         ax_top.set_ylabel("Height (km)")
-        title_top = f"{label}: altitude convergence"
-        if diverged_zoom:
-            title_top += f"\n(dt={diverged_zoom} diverged, omitted)"
+        title_top = f"{label}: altitude convergence (full trajectory)"
+        if diverged:
+            title_top += f"\n(dt={diverged} diverged, omitted)"
         ax_top.set_title(title_top, fontsize=9)
         ax_top.legend(fontsize=6)
         ax_top.grid(True, linestyle="--", alpha=0.4)
 
+        ax_bot.set_xlim(*shared_xlim)
+        ax_bot.set_ylim(*shared_ylim)
         ax_bot.set_xlabel("Longitude (deg E)")
         ax_bot.set_ylabel("Latitude (deg N)")
         title_bot = f"{label}: impact location vs. step size"
-        if diverged_full:
-            title_bot += f"\n(dt={diverged_full} unstable path, omitted)"
+        if diverged:
+            title_bot += f"\n(dt={diverged} unstable path, omitted)"
         ax_bot.set_title(title_bot, fontsize=9)
         ax_bot.legend(fontsize=6)
         ax_bot.grid(True, linestyle="--", alpha=0.4)
-
-        if diverged_zoom:
-            print(f"{label}: dt={diverged_zoom} diverged off-scale in the 0-6s altitude plot.")
-        if diverged_full:
-            print(f"{label}: dt={diverged_full} produced an unstable path (or no impact) — omitted.")
 
     fig.suptitle("Figure B: Step-size convergence and resulting impact-location error, "
                    "by method (RK2 / RK4 / RK45)", fontsize=13)
