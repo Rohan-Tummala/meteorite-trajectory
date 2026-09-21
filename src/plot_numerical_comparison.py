@@ -42,7 +42,15 @@ from plot_trajectory import great_circle_distance
 params = DEFAULT_PARAMS
 FULL_SPAN = (0.0, 600.0)
 ZOOM_SPAN = (0.0, 6.0)
-STEP_SIZES = [20.0, 10.0, 5.0, 2.5, 1.0, 0.5, 0.1]
+STEP_SIZES = [20.0, 10.0, 5.0, 4.0, 3.0, 2.5, 2.0, 1.5, 1.0, 0.75, 0.5, 0.3, 0.2, 0.1]
+
+# RK45's real accuracy control is rtol, not max_step (max_step only ever
+# binds during the calm dark-flight phase for this problem -- see the
+# diagnostic trace showing RK45 self-selects sub-0.15s steps during the
+# violent early phase regardless of any cap up to 20s). So RK45's column
+# sweeps rtol instead, the fair equivalent of testing how coarse the
+# method can be.
+RK45_TOLERANCES = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10]
 
 
 # ---------------------------------------------------------------------
@@ -64,15 +72,14 @@ def run_truth(t_span=FULL_SPAN):
     return sol
 
 
-def run_rk45_capped(max_step, t_span=FULL_SPAN, rtol=1e-8):
-    """RK45, adaptive internally but capped at max_step — the closest
-    equivalent of 'step size' for an adaptive method."""
+def run_rk45_tol(rtol, t_span=FULL_SPAN):
+    """RK45 with NO max_step cap — rtol is the actual accuracy knob."""
     ground_impact_event.terminal = True
     ground_impact_event.direction = -1
     sol = solve_ivp(
         fun=lambda t, y: meteor_rhs(t, y, params=params),
         t_span=t_span, y0=initial_state(), method="RK45",
-        rtol=rtol, atol=rtol * 1e-2, max_step=max_step,
+        rtol=rtol, atol=rtol * 1e-2,
         dense_output=True, events=ground_impact_event,
     )
     return sol
@@ -217,48 +224,49 @@ def figure_B():
     colors = plt.cm.viridis(np.linspace(0, 0.9, len(STEP_SIZES)))
 
     methods = [
-        ("RK2", "rk2", "fixed"),
-        ("RK4", "rk4", "fixed"),
-        ("RK45", None, "adaptive_capped"),
+        ("RK2", "rk2", "fixed", STEP_SIZES, lambda v: f"dt={v}s"),
+        ("RK4", "rk4", "fixed", STEP_SIZES, lambda v: f"dt={v}s"),
+        ("RK45", None, "adaptive_tol", RK45_TOLERANCES, lambda v: f"rtol={v:.0e}"),
     ]
 
     # --- Pass 1: run everything once (full span only — reused for both
     # the top-row altitude curve and the bottom-row impact point), and
-    # collect the sane impact points so we can set shared axis limits
+    # collect the sane impact points so shared axis limits can be set
     # across all three bottom panels before plotting anything. ---
     results_by_col = []
     all_impact_lons, all_impact_lats = [], []
 
-    for label, fkey, kind in methods:
+    for label, fkey, kind, sweep_values, label_fn in methods:
         diverged = []
-        entries = []  # (dt, t_array, h_array_km, lat_i, lon_i, color)
+        entries = []  # (value, t_array, h_array_km, lat_i, lon_i, color, label)
+        colors = plt.cm.viridis(np.linspace(0, 0.9, len(sweep_values)))
 
-        for dt, color in zip(STEP_SIZES, colors):
+        for value, color in zip(sweep_values, colors):
             if kind == "fixed":
-                res = run_fixed(fkey, dt=dt, t_span=FULL_SPAN)
+                res = run_fixed(fkey, dt=value, t_span=FULL_SPAN)
                 t_arr, h_arr = res["t"], res["y"][0] / 1000.0
                 lat_i, lon_i = impact_latlon_fixed(res)
                 path_ok = path_is_sane(res["y"]) if lat_i is not None else False
-            else:
-                sol = run_rk45_capped(max_step=dt, t_span=FULL_SPAN)
+            else:  # RK45, sweeping rtol, no max_step cap
+                sol = run_rk45_tol(rtol=value, t_span=FULL_SPAN)
                 t_arr = np.linspace(0, sol.t[-1], 400)
                 h_arr = sol.sol(t_arr)[0] / 1000.0
                 lat_i, lon_i = impact_latlon_solveivp(sol)
                 path_ok = path_is_sane(sol.y) if lat_i is not None else False
 
             if lat_i is None or not path_ok:
-                diverged.append(dt)
+                diverged.append(value)
                 continue
 
             err_from_truth = great_circle_distance(lat_i, lon_i, lat_truth, lon_truth)
-            print(f"{label:>5} dt={dt:>5}: impact offset from truth = {err_from_truth:8.2f} m")
-            entries.append((dt, t_arr, h_arr, lat_i, lon_i, color))
+            print(f"{label:>5} {label_fn(value):>14}: impact offset from truth = {err_from_truth:8.2f} m")
+            entries.append((value, t_arr, h_arr, lat_i, lon_i, color, label_fn(value)))
             all_impact_lons.append(np.degrees(lon_i))
             all_impact_lats.append(np.degrees(lat_i))
 
-        results_by_col.append((label, kind, entries, diverged))
+        results_by_col.append((label, entries, diverged, label_fn))
         if diverged:
-            print(f"{label}: dt={diverged} produced an unstable path (or no impact) — omitted.")
+            print(f"{label}: {[label_fn(v) for v in diverged]} produced an unstable path (or no impact) — omitted.")
 
     # Shared bottom-row axis limits, covering every sane impact point
     # across all three methods, plus truth and the real recovery site,
@@ -273,7 +281,7 @@ def figure_B():
     shared_ylim = (lat_min - lat_pad, lat_max + lat_pad)
 
     # --- Pass 2: plot, now that shared bottom-row limits are known. ---
-    for col, (label, kind, entries, diverged) in enumerate(results_by_col):
+    for col, (label, entries, diverged, label_fn) in enumerate(results_by_col):
         ax_top = axes[0, col]
         ax_bot = axes[1, col]
 
@@ -283,8 +291,7 @@ def figure_B():
         ax_bot.plot(RECOVERY_LON_DEG, RECOVERY_LAT_DEG, "*", color="tab:green",
                      markersize=16, label="Real recovery", zorder=5)
 
-        for dt, t_arr, h_arr, lat_i, lon_i, color in entries:
-            step_label = f"dt={dt}s" if kind == "fixed" else f"max_step={dt}s"
+        for value, t_arr, h_arr, lat_i, lon_i, color, step_label in entries:
             ax_top.plot(t_arr, h_arr, "-", color=color, linewidth=1.2, label=step_label)
             ax_bot.plot(np.degrees(lon_i), np.degrees(lat_i), "o", color=color,
                          markersize=7, label=step_label)
@@ -292,9 +299,9 @@ def figure_B():
         ax_top.set_ylim(-10, 90)
         ax_top.set_xlabel("Time (s)")
         ax_top.set_ylabel("Height (km)")
-        title_top = f"{label}: altitude convergence (full trajectory)"
+        title_top = f"{label}: convergence (full trajectory)"
         if diverged:
-            title_top += f"\n(dt={diverged} diverged, omitted)"
+            title_top += f"\n({[label_fn(v) for v in diverged]} diverged, omitted)"
         ax_top.set_title(title_top, fontsize=9)
         ax_top.legend(fontsize=6)
         ax_top.grid(True, linestyle="--", alpha=0.4)
@@ -303,15 +310,15 @@ def figure_B():
         ax_bot.set_ylim(*shared_ylim)
         ax_bot.set_xlabel("Longitude (deg E)")
         ax_bot.set_ylabel("Latitude (deg N)")
-        title_bot = f"{label}: impact location vs. step size"
+        title_bot = f"{label}: impact location"
         if diverged:
-            title_bot += f"\n(dt={diverged} unstable path, omitted)"
+            title_bot += f"\n({[label_fn(v) for v in diverged]} unstable, omitted)"
         ax_bot.set_title(title_bot, fontsize=9)
         ax_bot.legend(fontsize=6)
         ax_bot.grid(True, linestyle="--", alpha=0.4)
 
-    fig.suptitle("Figure B: Step-size convergence and resulting impact-location error, "
-                   "by method (RK2 / RK4 / RK45)", fontsize=13)
+    fig.suptitle("Figure B: Convergence and resulting impact-location error, by method\n"
+                   "(RK2/RK4: fixed step size  |  RK45: rtol, no max_step cap)", fontsize=12)
     fig.tight_layout()
     plt.show()
 
