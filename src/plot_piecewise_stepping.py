@@ -92,6 +92,14 @@ PAIRS = [
     (0.025, 0.25),
 ]
 
+# Uniform (non-piecewise) step sizes, applied across the WHOLE flight
+# (0 to impact) with no phase split at all -- used as a baseline to
+# test whether piecewise stepping actually buys anything over just
+# using the fine (luminous-phase-safe) step size everywhere.
+UNIFORM_STEP_SIZES = [dt_fine for dt_fine, dt_coarse in PAIRS]  # match every
+# fine value tested in the piecewise pairs, for a genuine point-for-point
+# comparison instead of one lone surviving uniform point.
+
 # Reference solver tolerances.
 REFERENCE_RTOL = 1e-10
 REFERENCE_ATOL = 1e-12
@@ -261,6 +269,129 @@ def run_piecewise_rk45(max_step_fine, max_step_coarse):
         sol1.t,
         sol1.y,
     )
+
+
+# ============================================================================
+# UNIFORM (NON-PIECEWISE) FIXED-STEP INTEGRATION
+# ============================================================================
+
+def run_uniform_fixed(method, dt):
+    """
+    RK2/RK4 with a SINGLE fixed step size applied across the whole
+    flight (0 to FULL_END), no phase split. Used as a baseline to
+    test whether piecewise stepping actually saves computation
+    compared to just using the luminous-phase-safe step everywhere.
+    """
+    f = lambda t, y: meteor_rhs(t, y, params=params)
+    y0 = initial_state()
+    result = integrate_fixed_step(f, y0, 0.0, FULL_END, dt, method=method)
+    return result["t"], result["y"], result["event_y"]
+
+
+# ============================================================================
+# RIGOROUS LOCAL STABILITY TIMESCALE (Jacobian eigenvalue)
+# ============================================================================
+
+def numerical_jacobian(f, t, y, eps_rel=1e-6):
+    """
+    Finite-difference Jacobian df/dy of the RHS at (t, y), shape (7,7).
+    Forward difference, step size scaled to each state's own magnitude
+    to keep the perturbation well-conditioned across variables of very
+    different scale (h in metres vs. gamma in radians, etc.).
+    """
+    n = len(y)
+    J = np.zeros((n, n))
+    f0 = f(t, y)
+    for j in range(n):
+        dy = np.zeros(n)
+        step = eps_rel * max(abs(y[j]), 1.0)
+        dy[j] = step
+        f1 = f(t, y + dy)
+        J[:, j] = (f1 - f0) / step
+    return J
+
+
+def local_timescale(f, t, y):
+    """
+    Rigorous local stability timescale: tau = 1 / max(|Re(eigenvalue)|)
+    of the Jacobian df/dy at this state. This is the general definition
+    -- no assumption about which state variable or physical effect
+    dominates, unlike the hand-derived estimates used elsewhere in this
+    project (scale-height/velocity for the luminous phase, drag
+    sensitivity for dark flight). An explicit fixed-step method needs
+    dt well below this value at every point along the trajectory to
+    remain numerically stable.
+    """
+    J = numerical_jacobian(f, t, y)
+    eigvals = np.linalg.eigvals(J)
+    max_mag = np.max(np.abs(eigvals.real))
+    return 1.0 / max_mag if max_mag > 0 else np.inf
+
+
+def figure_stability_timescale(data, n_points=300):
+    """
+    Plot the rigorous local stability timescale tau(t) along the whole
+    reference trajectory, alongside the ACTUAL piecewise step schedule
+    (fine dt for 0-PHASE_SPLIT, then coarse dt for PHASE_SPLIT-impact)
+    for every PAIRS entry, for both RK2 and RK4 -- using the real
+    pass/fail status already computed in compute_piecewise_results, so
+    it's directly visible which schedules stay below tau(t) everywhere
+    (and survived) versus cross above it (and failed), and exactly
+    where that crossing happens.
+    """
+    reference = data["reference"]
+    t_vals = np.linspace(0.001, reference.t[-1], n_points)
+    f = lambda t, y: meteor_rhs(t, y, params=params)
+
+    tau_vals = np.array([
+        local_timescale(f, t, reference.sol(t)) for t in t_vals
+    ])
+
+    fig, ax = plt.subplots(figsize=(12, 7.5))
+    ax.semilogy(t_vals, tau_vals, "-", color="black", linewidth=2.5,
+                 label=r"Local stability timescale $\tau(t)$ (rigorous)", zorder=10)
+
+    # Build a status lookup: (method_label, dt_fine, dt_coarse) -> status
+    status_lookup = {}
+    for method_data in data["results_by_method"]:
+        label = method_data["label"]
+        if label == "RK45":
+            continue  # adaptive; a fixed schedule isn't meaningful for it
+        for entry in method_data["entries"]:
+            status_lookup[(label, entry["dt_fine"], entry["dt_coarse"])] = entry["status"]
+
+    t_end = reference.t[-1]
+    line_styles = {"RK2": ("tab:orange", 0), "RK4": ("tab:green", 1)}
+
+    for method_label, (color, offset) in line_styles.items():
+        for i, (dt_fine, dt_coarse) in enumerate(PAIRS):
+            status = status_lookup.get((method_label, dt_fine, dt_coarse), "?")
+            ok = (status == "OK")
+
+            # Step schedule: dt_fine for [0, PHASE_SPLIT), dt_coarse after
+            t_step = [0, PHASE_SPLIT, PHASE_SPLIT, t_end]
+            dt_step = [dt_fine, dt_fine, dt_coarse, dt_coarse]
+
+            style = "-" if ok else ":"
+            alpha = 0.9 if ok else 0.6
+            lw = 1.8 if ok else 1.3
+            marker = None if ok else "x"
+            label = f"{method_label} {dt_fine:g}s/{dt_coarse:g}s ({status})"
+
+            ax.plot(t_step, dt_step, style, color=color, alpha=alpha,
+                     linewidth=lw, marker=marker, markersize=6,
+                     markevery=[1, 2] if not ok else None, label=label)
+
+    ax.axvline(PHASE_SPLIT, color="gray", linestyle=":", alpha=0.5,
+                label=f"phase split ({PHASE_SPLIT:g}s)")
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel(r"$\tau$ (s)  /  step size (s)")
+    ax.set_title("Rigorous local stability timescale vs. actual piecewise step "
+                  "schedules (solid = survived, dotted = failed)")
+    ax.grid(True, which="both", linestyle="--", alpha=0.3)
+    ax.legend(fontsize=6.5, ncol=2, loc="upper right")
+    plt.tight_layout()
+    plt.show()
 
 
 # ============================================================================
@@ -881,6 +1012,101 @@ def figure_trajectory_error(data, method_name="RK2"):
 
 
 # ============================================================================
+# UNIFORM VS. PIECEWISE COMPARISON
+# ============================================================================
+
+def compute_uniform_results():
+    """
+    Run RK2/RK4 with a single fixed step (0.1s, 1.0s) across the WHOLE
+    flight, timed, compared against the DOP853 reference. Returns a
+    structure matching compute_piecewise_results()'s entry format
+    closely enough to plot alongside it.
+    """
+    reference = run_reference()
+    reference_event_y = (reference.y_events[0][0]
+                           if len(reference.t_events[0]) > 0 else None)
+
+    results_by_method = {}
+    for label, fkey in [("RK2", "rk2"), ("RK4", "rk4")]:
+        entries = []
+        print(f"\n{label} (uniform, whole flight):")
+        for dt in UNIFORM_STEP_SIZES:
+            t0 = time.perf_counter()
+            t_all, y_all, event_y = run_uniform_fixed(fkey, dt)
+            runtime_s = time.perf_counter() - t0
+            sane = path_is_sane(y_all)
+            n_steps = len(t_all) - 1
+
+            if event_y is not None and sane:
+                impact_error = calculate_impact_error(event_y, reference_event_y)
+                status = "OK"
+                print(f"  dt={dt:>4}: steps={n_steps:>5}  runtime={runtime_s:7.3f}s  "
+                      f"error={impact_error:9.2f} m")
+            else:
+                impact_error = None
+                status = "UNSTABLE" if event_y is None else "UNSTABLE"
+                print(f"  dt={dt:>4}: steps={n_steps:>5}  runtime={runtime_s:7.3f}s  "
+                      f"DIVERGED / NO IMPACT")
+
+            entries.append({
+                "dt": dt, "n_steps": n_steps, "runtime_s": runtime_s,
+                "impact_error": impact_error, "status": status,
+            })
+        results_by_method[label] = entries
+
+    return results_by_method
+
+
+def figure_uniform_vs_piecewise(piecewise_data, uniform_results):
+    """
+    Runtime vs. impact-location error, comparing piecewise stepping
+    (fine luminous-phase step + coarse dark-flight step) against a
+    single uniform fine step applied across the whole flight -- shows
+    directly whether piecewise stepping saves computation for the
+    same accuracy, or whether it costs accuracy to do so.
+
+    Piecewise points: circles. Uniform points: squares (same color
+    per method, different marker so the two are easy to tell apart
+    on the same axes).
+    """
+    fig, ax = plt.subplots(figsize=(9, 7))
+
+    # Piecewise points (existing results)
+    for method_data in piecewise_data["results_by_method"]:
+        label = method_data["label"]
+        if label == "RK45":
+            continue  # adaptive; not a fair comparison to a fixed uniform step
+        color = METHOD_COLORS.get(label, "gray")
+        rows = [(e["runtime_s"], e["impact_error"])
+                for e in method_data["entries"]
+                if e["status"] == "OK" and e["impact_error"] is not None]
+        if rows:
+            rows.sort()
+            times, errs = zip(*rows)
+            ax.loglog(times, errs, "o-", color=color, markersize=8,
+                       label=f"{label} (piecewise)")
+
+    # Uniform points (new results)
+    for label, entries in uniform_results.items():
+        color = METHOD_COLORS.get(label, "gray")
+        rows = [(e["runtime_s"], e["impact_error"]) for e in entries
+                if e["status"] == "OK" and e["impact_error"] is not None]
+        if rows:
+            rows.sort()
+            times, errs = zip(*rows)
+            ax.loglog(times, errs, "s--", color=color, markersize=10,
+                       label=f"{label} (uniform, whole flight)")
+
+    ax.set_xlabel("Computation time (s)")
+    ax.set_ylabel("Impact-location error vs. reference (m)")
+    ax.set_title("Piecewise stepping vs. uniform fine step (whole flight)")
+    ax.grid(True, which="both", linestyle="--", alpha=0.4)
+    ax.legend(fontsize=9)
+    plt.tight_layout()
+    plt.show()
+
+
+# ============================================================================
 # FIGURE 7 — COMPUTATION TIME VS ACCURACY
 # ============================================================================
 
@@ -1010,3 +1236,8 @@ if __name__ == "__main__":
 
     figure_trajectory_error(data, method_name="RK2")
     figure_trajectory_error(data, method_name="RK4")
+
+    uniform_results = compute_uniform_results()
+    figure_uniform_vs_piecewise(data, uniform_results)
+
+    figure_stability_timescale(data)
