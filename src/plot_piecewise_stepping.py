@@ -331,13 +331,12 @@ def local_timescale(f, t, y):
 def figure_stability_timescale(data, n_points=300):
     """
     Plot the rigorous local stability timescale tau(t) along the whole
-    reference trajectory, alongside the ACTUAL piecewise step schedule
-    (fine dt for 0-PHASE_SPLIT, then coarse dt for PHASE_SPLIT-impact)
-    for every PAIRS entry, for both RK2 and RK4 -- using the real
-    pass/fail status already computed in compute_piecewise_results, so
-    it's directly visible which schedules stay below tau(t) everywhere
-    (and survived) versus cross above it (and failed), and exactly
-    where that crossing happens.
+    reference trajectory, alongside horizontal reference lines for
+    every distinct step size tested elsewhere in this file (PAIRS'
+    fine/coarse values, UNIFORM_STEP_SIZES) -- so it's directly
+    visible which tested step sizes sit above tau(t) (unstable there)
+    versus below it (safe there), and exactly where that crossover
+    happens.
     """
     reference = data["reference"]
     t_vals = np.linspace(0.001, reference.t[-1], n_points)
@@ -347,49 +346,25 @@ def figure_stability_timescale(data, n_points=300):
         local_timescale(f, t, reference.sol(t)) for t in t_vals
     ])
 
-    fig, ax = plt.subplots(figsize=(12, 7.5))
-    ax.semilogy(t_vals, tau_vals, "-", color="black", linewidth=2.5,
-                 label=r"Local stability timescale $\tau(t)$ (rigorous)", zorder=10)
+    fig, ax = plt.subplots(figsize=(11, 6.5))
+    ax.semilogy(t_vals, tau_vals, "-", color="black", linewidth=2,
+                 label=r"Local stability timescale $\tau(t)$ (rigorous)")
 
-    # Build a status lookup: (method_label, dt_fine, dt_coarse) -> status
-    status_lookup = {}
-    for method_data in data["results_by_method"]:
-        label = method_data["label"]
-        if label == "RK45":
-            continue  # adaptive; a fixed schedule isn't meaningful for it
-        for entry in method_data["entries"]:
-            status_lookup[(label, entry["dt_fine"], entry["dt_coarse"])] = entry["status"]
+    tested_dts = sorted(set(
+        [dt for pair in PAIRS for dt in pair] + list(UNIFORM_STEP_SIZES)
+    ))
+    colors = plt.cm.plasma(np.linspace(0, 0.85, len(tested_dts)))
+    for dt, color in zip(tested_dts, colors):
+        ax.axhline(dt, color=color, linestyle="--", linewidth=1,
+                    label=f"dt = {dt:g}s")
 
-    t_end = reference.t[-1]
-    line_styles = {"RK2": ("tab:orange", 0), "RK4": ("tab:green", 1)}
-
-    for method_label, (color, offset) in line_styles.items():
-        for i, (dt_fine, dt_coarse) in enumerate(PAIRS):
-            status = status_lookup.get((method_label, dt_fine, dt_coarse), "?")
-            ok = (status == "OK")
-
-            # Step schedule: dt_fine for [0, PHASE_SPLIT), dt_coarse after
-            t_step = [0, PHASE_SPLIT, PHASE_SPLIT, t_end]
-            dt_step = [dt_fine, dt_fine, dt_coarse, dt_coarse]
-
-            style = "-" if ok else ":"
-            alpha = 0.9 if ok else 0.6
-            lw = 1.8 if ok else 1.3
-            marker = None if ok else "x"
-            label = f"{method_label} {dt_fine:g}s/{dt_coarse:g}s ({status})"
-
-            ax.plot(t_step, dt_step, style, color=color, alpha=alpha,
-                     linewidth=lw, marker=marker, markersize=6,
-                     markevery=[1, 2] if not ok else None, label=label)
-
-    ax.axvline(PHASE_SPLIT, color="gray", linestyle=":", alpha=0.5,
+    ax.axvline(PHASE_SPLIT, color="gray", linestyle=":", alpha=0.6,
                 label=f"phase split ({PHASE_SPLIT:g}s)")
     ax.set_xlabel("Time (s)")
     ax.set_ylabel(r"$\tau$ (s)  /  step size (s)")
-    ax.set_title("Rigorous local stability timescale vs. actual piecewise step "
-                  "schedules (solid = survived, dotted = failed)")
+    ax.set_title("Rigorous local stability timescale vs. every step size tested")
     ax.grid(True, which="both", linestyle="--", alpha=0.3)
-    ax.legend(fontsize=6.5, ncol=2, loc="upper right")
+    ax.legend(fontsize=7, ncol=2)
     plt.tight_layout()
     plt.show()
 
@@ -1096,6 +1071,24 @@ def figure_uniform_vs_piecewise(piecewise_data, uniform_results):
             times, errs = zip(*rows)
             ax.loglog(times, errs, "s--", color=color, markersize=10,
                        label=f"{label} (uniform, whole flight)")
+
+    # RK45 reference line -- NOT part of the piecewise-vs-uniform
+    # comparison (RK45 doesn't have a meaningful distinction between
+    # the two, since its own adaptivity already ignores most max_step
+    # caps during the fast phase regardless of what's requested) --
+    # shown only for scale, with a visually distinct marker/style so
+    # it's clearly not implying a third "mode" alongside piecewise/uniform.
+    for method_data in piecewise_data["results_by_method"]:
+        if method_data["label"] != "RK45":
+            continue
+        rows = [(e["runtime_s"], e["impact_error"])
+                for e in method_data["entries"]
+                if e["status"] == "OK" and e["impact_error"] is not None]
+        if rows:
+            rows.sort()
+            times, errs = zip(*rows)
+            ax.loglog(times, errs, "^:", color="tab:blue", markersize=9,
+                       alpha=0.7, label="RK45 (reference, for scale only)")
 
     ax.set_xlabel("Computation time (s)")
     ax.set_ylabel("Impact-location error vs. reference (m)")
