@@ -85,6 +85,27 @@ def run_rk45_tol(rtol, t_span=FULL_SPAN):
     return sol
 
 
+def run_rk45_capped(max_step, t_span=FULL_SPAN, rtol=1e-8):
+    """
+    RK45 with a max_step CAP (not a tolerance sweep) — used only in
+    Figure A, where the point is a like-for-like "same coarse step
+    size as RK2/RK4" comparison, not testing RK45's own accuracy
+    limits (that's what run_rk45_tol / Figure B is for). Note: because
+    RK45 is adaptive, this cap only ever binds during the calm dark-
+    flight phase for this problem -- see the max_step-vs-rtol finding
+    from Figure B's own investigation.
+    """
+    ground_impact_event.terminal = True
+    ground_impact_event.direction = -1
+    sol = solve_ivp(
+        fun=lambda t, y: meteor_rhs(t, y, params=params),
+        t_span=t_span, y0=initial_state(), method="RK45",
+        rtol=rtol, atol=rtol * 1e-2, max_step=max_step,
+        dense_output=True, events=ground_impact_event,
+    )
+    return sol
+
+
 def run_fixed(method, dt, t_span=FULL_SPAN):
     f = lambda t, y: meteor_rhs(t, y, params=params)
     return integrate_fixed_step(f, initial_state(), t_span[0], t_span[1], dt, method=method)
