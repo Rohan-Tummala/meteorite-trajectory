@@ -370,6 +370,178 @@ def figure_stability_timescale(data, n_points=300):
 
 
 # ============================================================================
+# EXACT RUNGE-KUTTA STABILITY FUNCTIONS (amplification-factor comparison)
+# ============================================================================
+
+def find_stiffest_time(data, t_lo, t_hi, n=400):
+    """
+    Scan [t_lo, t_hi] along the reference trajectory and return the time
+    at which local_timescale() is SMALLEST (i.e. the Jacobian's dominant
+    eigenvalue magnitude is LARGEST) -- the single worst-case instant for
+    explicit-method stability in that window.
+
+    tau(t) is not monotonic (see figure_stability_timescale()'s plot),
+    so this is not the same as the phase boundary or either endpoint --
+    it has to be found by scanning.
+    """
+    reference = data["reference"]
+    f = lambda t, y: meteor_rhs(t, y, params=params)
+    t_vals = np.linspace(t_lo, t_hi, n)
+    tau_vals = np.array([local_timescale(f, t, reference.sol(t)) for t in t_vals])
+    return t_vals[np.argmin(tau_vals)]
+
+
+def rk_stability_function(A, b, z):
+    """
+    Exact stability function R(z) of an explicit Runge-Kutta method with
+    Butcher tableau (A, b), on the scalar linear test equation
+    y' = lambda*y (z = h*lambda). Derived by forward substitution
+    through the stages (A is strictly lower triangular for an explicit
+    method, so no matrix inversion is needed): stage i has value
+    Y_i = y_n*phi_i(z), with phi_i = 1 + z*sum_{j<i} A[i,j]*phi_j
+    (phi_1 = 1 since c_1 = 0), and R(z) = 1 + z*sum_i b_i*phi_i(z).
+    Standard result -- see Hairer & Wanner, "Solving Ordinary
+    Differential Equations I", Ch. IV.2.
+    """
+    z = np.asarray(z, dtype=float)
+    s = len(b)
+    phi = [np.ones_like(z)]
+    for i in range(1, s):
+        acc = np.ones_like(z)
+        for j in range(i):
+            if A[i, j] != 0.0:
+                acc = acc + z * A[i, j] * phi[j]
+        phi.append(acc)
+    R = np.ones_like(z)
+    for i in range(s):
+        if b[i] != 0.0:
+            R = R + z * b[i] * phi[i]
+    return R
+
+
+def R_euler(z):
+    """Stability function of explicit (forward) Euler."""
+    return 1.0 + z
+
+
+def R_rk2(z):
+    """Stability function of Heun's method (explicit RK2)."""
+    return 1.0 + z + z**2 / 2.0
+
+
+def R_rk4(z):
+    """Stability function of the classical 4th-order Runge-Kutta method."""
+    return 1.0 + z + z**2 / 2.0 + z**3 / 6.0 + z**4 / 24.0
+
+
+# Sanity check: the generic stage-recursion formula, applied to the
+# classical RK4 Butcher tableau, must reproduce the closed-form
+# polynomial above exactly -- confirms rk_stability_function() itself
+# is correct before trusting it for RK45's (much less familiar) tableau.
+_RK4_A = np.zeros((4, 4))
+_RK4_A[1, 0] = 0.5
+_RK4_A[2, 1] = 0.5
+_RK4_A[3, 2] = 1.0
+_RK4_B = np.array([1/6, 1/3, 1/3, 1/6])
+_z_test = np.array([-1.0, -2.0, -2.785, 0.5])
+assert np.allclose(rk_stability_function(_RK4_A, _RK4_B, _z_test), R_rk4(_z_test)), \
+    "rk_stability_function() does not reproduce the known closed-form RK4 R(z)"
+
+# Dormand-Prince RK5(4)7FM Butcher tableau (Dormand & Prince, 1980) --
+# the exact coefficients scipy.integrate.solve_ivp uses for method=
+# "RK45". Only the 5th-order weights (b) are needed here, since
+# solve_ivp propagates the solution using local extrapolation (the
+# 5th-order result); the 4th-order estimate is used only internally
+# for step-size control and does not affect this stability analysis.
+_DP_A = np.zeros((7, 7))
+_DP_A[1, 0] = 1/5
+_DP_A[2, 0], _DP_A[2, 1] = 3/40, 9/40
+_DP_A[3, 0], _DP_A[3, 1], _DP_A[3, 2] = 44/45, -56/15, 32/9
+_DP_A[4, 0], _DP_A[4, 1], _DP_A[4, 2], _DP_A[4, 3] = \
+    19372/6561, -25360/2187, 64448/6561, -212/729
+_DP_A[5, 0], _DP_A[5, 1], _DP_A[5, 2], _DP_A[5, 3], _DP_A[5, 4] = \
+    9017/3168, -355/33, 46732/5247, 49/176, -5103/18656
+_DP_A[6, 0], _DP_A[6, 1], _DP_A[6, 2], _DP_A[6, 3], _DP_A[6, 4], _DP_A[6, 5] = \
+    35/384, 0.0, 500/1113, 125/192, -2187/6784, 11/84
+
+_DP_B = np.array([35/384, 0.0, 500/1113, 125/192, -2187/6784, 11/84, 0.0])
+
+
+def R_rk45(z):
+    """
+    Exact stability function of the Dormand-Prince RK5(4) pair, as
+    propagated by scipy's RK45, computed from its actual Butcher
+    tableau via rk_stability_function() (not a reference/approximate
+    value from the literature).
+    """
+    return rk_stability_function(_DP_A, _DP_B, z)
+
+
+# ============================================================================
+# FIGURE — AMPLIFICATION FACTOR VS STEP SIZE
+# ============================================================================
+
+def figure_amplification_factor(data, t_sample=None, n_h=400):
+    """
+    Amplification factor |A(h)| vs. step size h, for RK2, RK4 and RK45,
+    all evaluated at ONE representative local eigenvalue
+    kappa = 1/tau(t_sample) (same numerical_jacobian()/local_timescale()
+    machinery used for the exact stability-boundary analysis elsewhere
+    in this file).
+
+    This is the vector-system extension of the notes' scalar
+    perturbation-based stability derivation: the local Jacobian's
+    dominant eigenvalue plays the role of the notes' single lambda
+    (lambda = -kappa, a decaying real mode), and each method's
+    amplification factor is evaluated at z = h*lambda. Each method's
+    |R(z)| exceeds 1 beyond its own stability boundary, visible
+    directly as the curve crossing the dashed threshold line.
+
+    Default t_sample: the STIFFEST instant in the luminous phase (the
+    minimum of tau(t) over [0, PHASE_SPLIT], found by find_stiffest_time()
+    -- NOT the phase-split time itself). tau(t) dips to its smallest
+    value mid-luminous-phase (around peak dynamic pressure/heating) and
+    is actually larger again by the time dark flight starts, so this is
+    the point that genuinely sets the binding stability constraint the
+    fine step size has to respect -- an arbitrary point like PHASE_SPLIT
+    understates how tight that constraint really is.
+    """
+    reference = data["reference"]
+    if t_sample is None:
+        t_sample = find_stiffest_time(data, 0.0, PHASE_SPLIT)
+    f = lambda t, y: meteor_rhs(t, y, params=params)
+    y_sample = reference.sol(t_sample)
+    kappa = 1.0 / local_timescale(f, t_sample, y_sample)
+
+    h_vals = np.logspace(-2, 3, n_h)
+    z_vals = -kappa * h_vals  # lambda = -kappa (decaying real mode)
+
+    curves = {
+        "RK2": np.abs(R_rk2(z_vals)),
+        "RK4": np.abs(R_rk4(z_vals)),
+        "RK45": np.abs(R_rk45(z_vals)),
+    }
+
+    fig, ax = plt.subplots(figsize=(9, 6.5))
+    for label, A_vals in curves.items():
+        ax.loglog(h_vals, A_vals, "-", color=METHOD_COLORS.get(label, "gray"),
+                   linewidth=2, label=label)
+
+    ax.axhline(1.0, color="black", linestyle="--", linewidth=1,
+                label="stability threshold |A|=1")
+    ax.set_xlabel("Step size h (s)")
+    ax.set_ylabel("Amplification factor |A(h)|")
+    ax.set_title(
+        f"Amplification factor vs. step size at t={t_sample:g}s (stiffest luminous-phase instant)\n"
+        f"kappa={kappa:.4g} /s, tau={1/kappa:.4g}s"
+    )
+    ax.grid(True, which="both", linestyle="--", alpha=0.4)
+    ax.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+# ============================================================================
 # SANITY / STABILITY CHECKS
 # ============================================================================
 
@@ -1234,3 +1406,4 @@ if __name__ == "__main__":
     figure_uniform_vs_piecewise(data, uniform_results)
 
     figure_stability_timescale(data)
+    figure_amplification_factor(data)
