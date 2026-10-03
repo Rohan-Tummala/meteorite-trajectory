@@ -113,7 +113,8 @@ RK45_ATOL = 1e-10
 HEIGHT_LIMIT_KM = 1e5
 
 # Colours used consistently across the summary/time plots.
-METHOD_COLORS = {"RK2": "tab:orange", "RK4": "tab:green", "RK45": "tab:blue"}
+METHOD_COLORS = {"RK2": "tab:orange", "RK4": "tab:green", "RK45": "tab:blue",
+                  "Implicit Euler": "tab:red", "Implicit Heun": "tab:purple"}
 
 
 # ============================================================================
@@ -434,6 +435,32 @@ def R_rk4(z):
     return 1.0 + z + z**2 / 2.0 + z**3 / 6.0 + z**4 / 24.0
 
 
+def R_implicit_euler(z):
+    """
+    Stability function of backward (implicit) Euler: R(z) = 1/(1-z)
+    (Week 9.3.3, Eq. in terms of lambda*h rather than z, same object).
+    A genuine rational function (Q(z)=1-z != 1), unlike the explicit
+    methods above -- which is exactly why it stays bounded as z -> -inf
+    (|R(z)| -> 0) instead of blowing up like a polynomial does.
+    """
+    return 1.0 / (1.0 - z)
+
+
+def R_implicit_heun(z):
+    """
+    Stability function of the implicit (trapezoidal) Heun method
+    (Week 9 Workbook, Activity 2B): R(z) = (1 + z/2)/(1 - z/2).
+
+    A-stable like implicit Euler (|R(z)|<=1 for all Re(z)<=0, so never
+    unstable), but NOT L-stable: |R(z)| -> 1 as z -> -infinity, instead
+    of -> 0. Very stiff modes are therefore preserved (as bounded
+    oscillation) rather than damped out -- the reason it survives large
+    steps worse than implicit Euler in practice despite being
+    unconditionally stable in the same linear sense.
+    """
+    return (1.0 + z / 2.0) / (1.0 - z / 2.0)
+
+
 # Sanity check: the generic stage-recursion formula, applied to the
 # classical RK4 Butcher tableau, must reproduce the closed-form
 # polynomial above exactly -- confirms rk_stability_function() itself
@@ -520,6 +547,8 @@ def figure_amplification_factor(data, t_sample=None, n_h=400):
         "RK2": np.abs(R_rk2(z_vals)),
         "RK4": np.abs(R_rk4(z_vals)),
         "RK45": np.abs(R_rk45(z_vals)),
+        "Implicit Euler": np.abs(R_implicit_euler(z_vals)),
+        "Implicit Heun": np.abs(R_implicit_heun(z_vals)),
     }
 
     fig, ax = plt.subplots(figsize=(9, 6.5))
@@ -686,13 +715,26 @@ def compute_piecewise_results():
     y_reference_plot = reference.sol(t_reference_plot)
     height_reference_plot = y_reference_plot[0] / 1000.0
 
-    methods = [
-        ("RK2", "fixed", "rk2"),
-        ("RK4", "fixed", "rk4"),
-        ("RK45", "rk45", None),
-    ]
+    # Implicit Euler gets a few extra, much larger dt_coarse values on
+    # top of the shared PAIRS: being unconditionally stable (in the
+    # local-linear sense), it can take coarse steps RK2/RK4/RK45 simply
+    # cannot survive -- these extra pairs are what actually demonstrates
+    # that advantage in the computation-time vs. impact-error plot,
+    # rather than just asserting it. 20.0s was found by hand to be
+    # about where the step is still both Newton-stable and physically
+    # sane for this trajectory; 50.0s+ already produces nonphysical
+    # (even negative) velocities despite "converging" -- unconditional
+    # *stability* is not the same as *accuracy*, exactly the point
+    # Week 9.3 makes.
+    IMPLICIT_EXTRA_PAIRS = [(0.5, 10.0), (0.5, 15.0), (0.5, 20.0)]
 
-    colors = plt.cm.plasma(np.linspace(0, 0.8, len(PAIRS)))
+    methods = [
+        ("RK2", "fixed", "rk2", PAIRS),
+        ("RK4", "fixed", "rk4", PAIRS),
+        ("RK45", "rk45", None, PAIRS),
+        ("Implicit Euler", "fixed", "implicit_euler", PAIRS + IMPLICIT_EXTRA_PAIRS),
+        ("Implicit Heun", "fixed", "implicit_heun", PAIRS + IMPLICIT_EXTRA_PAIRS),
+    ]
 
     results_by_method = []
     all_lons = []
@@ -705,18 +747,19 @@ def compute_piecewise_results():
     all_lons.append(RECOVERY_LON_DEG)
     all_lats.append(RECOVERY_LAT_DEG)
 
-    for label, kind, fkey in methods:
+    for label, kind, fkey, pairs in methods:
 
         entries = []
         phase1_entries = []
         raw_full = []
         failed = []
+        colors = plt.cm.plasma(np.linspace(0, 0.8, len(pairs)))
 
         print("\n" + "=" * 80)
         print(label)
         print("=" * 80)
 
-        for (dt_fine, dt_coarse), color in zip(PAIRS, colors):
+        for (dt_fine, dt_coarse), color in zip(pairs, colors):
 
             # ------------------------------------------------------
             # Run (timed)
@@ -878,7 +921,8 @@ def figure_piecewise_full(data, outlier_threshold_km=20.0):
     shared_xlim = (min(scale_lons) - lon_pad, max(scale_lons) + lon_pad)
     shared_ylim = (min(scale_lats) - lat_pad, max(scale_lats) + lat_pad)
 
-    fig, axes = plt.subplots(2, 3, figsize=(17, 10))
+    n_methods = len(results_by_method)
+    fig, axes = plt.subplots(2, n_methods, figsize=(5.7 * n_methods, 10), squeeze=False)
 
     for col, method_data in enumerate(results_by_method):
         label = method_data["label"]
@@ -949,7 +993,9 @@ def figure_piecewise_luminous_zoom(data, zoom_end=12.0):
     t_reference = np.linspace(0, zoom_end, 500)
     h_reference = reference.sol(t_reference)[0] / 1000.0
 
-    fig, axes = plt.subplots(1, 3, figsize=(17, 5.5))
+    n_methods = len(results_by_method)
+    fig, axes = plt.subplots(1, n_methods, figsize=(5.7 * n_methods, 5.5), squeeze=False)
+    axes = axes[0]
 
     for col, method_data in enumerate(results_by_method):
         label = method_data["label"]
@@ -1003,7 +1049,9 @@ def figure_piecewise_dark_zoom(data, zoom_start=None, zoom_end=None):
     t_reference = np.linspace(zoom_start, zoom_end, 700)
     h_reference = reference.sol(t_reference)[0] / 1000.0
 
-    fig, axes = plt.subplots(1, 3, figsize=(17, 5.5))
+    n_methods = len(results_by_method)
+    fig, axes = plt.subplots(1, n_methods, figsize=(5.7 * n_methods, 5.5), squeeze=False)
+    axes = axes[0]
 
     for col, method_data in enumerate(results_by_method):
         label = method_data["label"]
@@ -1174,7 +1222,9 @@ def compute_uniform_results():
                            if len(reference.t_events[0]) > 0 else None)
 
     results_by_method = {}
-    for label, fkey in [("RK2", "rk2"), ("RK4", "rk4")]:
+    for label, fkey in [("RK2", "rk2"), ("RK4", "rk4"),
+                        ("Implicit Euler", "implicit_euler"),
+                        ("Implicit Heun", "implicit_heun")]:
         entries = []
         print(f"\n{label} (uniform, whole flight):")
         for dt in UNIFORM_STEP_SIZES:
