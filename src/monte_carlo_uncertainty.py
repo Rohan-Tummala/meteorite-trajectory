@@ -21,7 +21,9 @@ Sampled distributions:
         negligible compared to the other inputs (established via
         literature check earlier in this project).
 
-Output: a probability contour map (1 sigma/2 sigma/3 sigma highest-density regions)
+Output: a probability contour map (1-sigma/2-sigma/3-sigma, i.e.
+39.3%/86.5%/98.9% highest-density regions -- see hpd_levels()
+docstring for why these differ from the naive 1D 68/95/99.7% figures)
 over the impact footprint, plus the raw sample scatter, the nominal
 (baseline) impact point, and the real recovery location.
 """
@@ -141,7 +143,8 @@ def hpd_levels(density_values, mass_fractions=(0.393, 0.865, 0.989)):
 def plot_probability_contour(result, grid_res=200):
     """
     KDE-based probability contour map of the Monte Carlo impact
-    scatter, with 50/80/95% highest-density regions, the raw sample
+    scatter, with 1-sigma/2-sigma/3-sigma (39.3%/86.5%/98.9%)
+    highest-density regions, the raw sample
     scatter, the nominal (baseline-parameter) impact point, and the
     real recovery location.
     """
@@ -187,7 +190,7 @@ def plot_probability_contour(result, grid_res=200):
     contour_levels = sorted(levels) + [grid_density.max()]
     cs = ax.contourf(LON, LAT, grid_density, levels=contour_levels,
                        colors=["#ffeda0", "#feb24c", "#f03b20"],
-                       alpha=0.65, zorder=2)
+                       alpha=0.62, zorder=2)
     ax.contour(LON, LAT, grid_density, levels=sorted(levels),
                 colors="black", linewidths=1.0, alpha=0.7, zorder=3)
 
@@ -202,17 +205,24 @@ def plot_probability_contour(result, grid_res=200):
     # probability), matching Gardiol et al.'s own 1-sigma/3-sigma
     # convention for the published Cavezzo strewn-field ellipse.
     from matplotlib.patches import Patch
-    hpd_patches = [Patch(facecolor=c, alpha=0.65, label=lbl) for c, lbl in
+    hpd_patches = [Patch(facecolor=c, alpha=0.62, label=lbl) for c, lbl in
                     zip(["#f03b20", "#feb24c", "#ffeda0"],
                         ["1-sigma (39.3%)", "2-sigma (86.5%)", "3-sigma (98.9%)"])]
 
     ax.set_xlabel("Longitude (deg E)")
     ax.set_ylabel("Latitude (deg N)")
     ax.set_title(f"Monte Carlo impact-probability map "
-                  f"({len(lats)} samples, {result['n_failed']} failed)")
+                  f"({len(lats)} samples, {result['n_failed']} failed)\n"
+                  f"(axes not equal-scaled -- true footprint is far more "
+                  f"elongated along the flight path than shown)")
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles=handles + hpd_patches, fontsize=8, loc="best")
-    ax.set_aspect("equal", adjustable="datalim")
+    # Deliberately NOT ax.set_aspect("equal") here: at this fall's latitude,
+    # equal-scaling the lon/lat axes makes the (genuinely very elongated)
+    # dispersion ellipse render as an unreadably thin sliver. Auto aspect
+    # keeps the plot legible; the title note above flags that the axes are
+    # not geographically true-scaled, so the shape shouldn't be read as the
+    # real aspect ratio of the footprint on the ground.
     ax.grid(True, linestyle="--", alpha=0.3)
 
     fig.tight_layout()
