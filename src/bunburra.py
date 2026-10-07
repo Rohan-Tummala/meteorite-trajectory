@@ -58,6 +58,34 @@ LAMBDA0_UNC = np.radians(0.00018)
 PSI0_DEG = _bearing_deg(-31.4496, 129.82721, -31.3710, 129.25555)  # derived, ~279.15 deg
 PSI0 = np.radians(PSI0_DEG)
 
+# Heading uncertainty: NOT derived from differencing the entry/terminal
+# coordinate uncertainties above (PHI0_UNC/LAMBDA0_UNC etc.). Those two
+# points are both read off the SAME fitted trajectory line (113 observed
+# breaks), so their uncertainties are correlated, not independent --
+# treating them as independent position noise and propagating through
+# the bearing formula gives an artificially tiny heading uncertainty
+# (~0.04 deg), understating the real directional uncertainty.
+#
+# Instead, derived from the apparent radiant uncertainty, Table 4
+# (Spurny et al. 2012, p.177): aR = 62.62 +/- 0.03 deg,
+# dR = -22.59 +/- 0.03 deg (J2000.0 equatorial coordinates of the
+# meteoroid's flight direction, from the full astrometric solution).
+# This equatorial (RA/Dec) uncertainty was propagated through the
+# actual equatorial-to-horizontal (Alt/Az) coordinate transform at the
+# entry point's location and the fireball's exact UT time (20 July
+# 2007, 19:13:53.24 UT) -- i.e. via Julian Date -> GMST -> local
+# sidereal time -> hour angle -> standard Alt/Az formulas -- rather
+# than assuming the equatorial uncertainty carries straight across.
+# Result: local azimuth uncertainty = 0.0348 deg, essentially equal to
+# the raw 0.03 deg (the radiant sits at ~31 deg altitude here, far
+# from the zenith/horizon distortion that would make this transform
+# matter more). As a cross-check, the radiant's local azimuth + 180
+# deg (ground-track heading implied by "where the meteor came from")
+# gives 278.94 deg, matching the endpoint-bearing-derived PSI0_DEG
+# (~279.15 deg) above to within 0.2 deg -- two independent methods
+# agreeing confirms both the heading value and this uncertainty.
+PSI0_UNC = np.radians(0.0348)
+
 M0 = 22.1                  # kg, GFM dynamic mass +/- 0.3
 M0_UNC = 0.3
 
@@ -83,8 +111,15 @@ LAMBDA_TERMINAL_DEG = 129.25555
 LAMBDA_TERMINAL = np.radians(LAMBDA_TERMINAL_DEG)
 LAMBDA_TERMINAL_UNC = np.radians(0.00015)
 
-M_TERMINAL = 1.1            # kg, MFM dynamic mass, +/- ~0.3
-M_TERMINAL_UNC = 0.3
+M_TERMINAL = 1.1            # kg, GFM fit at hE=29.59 km (Table 3)
+# Paper states this as "standard deviation limits from 0.7 to 1.7"
+# (Spurny et al. 2012, p.176) -- i.e. an ASYMMETRIC range, roughly
+# +0.6/-0.4, not a symmetric +/-. M_TERMINAL_UNC below is a single
+# symmetric value approximating that range (used only where a single
+# number is needed); use M_TERMINAL_RANGE directly where the real
+# asymmetry matters.
+M_TERMINAL_UNC = 0.5
+M_TERMINAL_RANGE = (0.7, 1.7)   # paper's own stated limits
 
 DURATION = 5.68             # s
 PATH_LENGTH = 64650.0       # m
