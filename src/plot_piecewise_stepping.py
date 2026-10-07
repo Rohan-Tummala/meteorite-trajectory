@@ -1,57 +1,22 @@
 """
 plot_piecewise_stepping.py
 
-Tests a hand-crafted TWO-PHASE step size for meteor trajectory
-integration.
+Manually-prescribed TWO-PHASE step size (fine during luminous flight,
+coarse during dark flight), as a hand-crafted alternative to a fully
+adaptive solver -- tests whether allocating resolution by trajectory
+phase is as effective as letting RK45 choose its own steps.
 
-The motivation is to investigate whether temporal resolution can be
-allocated according to the physical behaviour of the trajectory:
+Methods compared: RK2, RK4 (literal fixed steps per phase), RK45
+(adaptive, with phase-specific max_step caps). DOP853 (tight tolerance)
+is the numerical reference solution, not the physical truth.
 
-    Phase 1: luminous / rapidly changing flight
-              -> small timestep
+Fine/coarse timestep pairs tested (coarse = 10x fine): (0.5, 5.0),
+(0.25, 2.5), (0.10, 1.0), (0.05, 0.5), (0.025, 0.25) s.
 
-    Phase 2: dark / slowly changing flight
-              -> larger timestep
-
-This is intentionally NOT an adaptive solver. The timestep is prescribed
-manually so that the effect of numerical method and timestep size can be
-studied explicitly.
-
-Methods compared:
-    - RK2
-    - RK4
-    - RK45 (adaptive internal timestep, with phase-specific max_step caps)
-
-A high-accuracy DOP853 solution is used as a numerical REFERENCE solution.
-It is not treated as the exact physical solution.
-
-The experiment investigates:
-    1. Effect of timestep size
-    2. Difference between RK2 and RK4
-    3. Stability / divergence of coarse timesteps
-    4. Error in predicted impact location
-    5. Error throughout the trajectory
-    6. Whether manually finer stepping during luminous flight and
-       coarser stepping during dark flight is effective
-    7. Computation time vs. accuracy trade-off across methods and step sizes
-
-The piecewise fixed-step experiment uses:
-
-    fine / coarse timestep pairs:
-
-        (0.5 s, 5.0 s)
-        (0.25 s, 2.5 s)
-        (0.10 s, 1.0 s)
-        (0.05 s, 0.5 s)
-        (0.025 s, 0.25 s)
-
-The coarse timestep is therefore 10x the fine timestep.
-
-For RK2/RK4, these are literal fixed timesteps.
-
-For RK45, they are maximum-step caps only. RK45 still chooses its
-own internal timestep based primarily on rtol/atol.
-
+Reports, per method and step-size pair: impact-location error,
+trajectory error vs. the reference, stability/divergence at coarse
+steps, and computation time -- i.e. whether phase-aware stepping beats
+uniform stepping for the same cost.
 """
 
 import time
