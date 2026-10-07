@@ -297,7 +297,6 @@ def plot_probability_contour(result, grid_res=200):
     ax.grid(True, linestyle="--", alpha=0.3)
 
     fig.tight_layout()
-    fig.savefig("fig_monte_carlo_bunburra_contour.png", dpi=150)
     plt.show()
 
     from plot_trajectory_bunburra import great_circle_distance
