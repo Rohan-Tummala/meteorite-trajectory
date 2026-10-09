@@ -10,15 +10,21 @@ comparable.
 Notes
 -----
 Uncertain inputs and their sampling are documented in sample_inputs().
-In short: H0, V0, GAMMA0, PHI0, LAMBDA0, M0 are independent normals
-using the paper's own reported 1-sigma values; PSI0 (heading) is not
-tabulated in the paper and is instead derived per sample from the
-perturbed entry/terminal coordinates; sigma_abl reuses the same
+In short: H0, V0, GAMMA0, PHI0, LAMBDA0, M0, PSI0 are independent
+normals using the paper's own reported (or paper-derived) 1-sigma
+values; PSI0_UNC specifically comes from the apparent radiant
+uncertainty (Table 4), not from differencing the entry/terminal
+coordinates -- see bunburra.py for why. sigma_abl reuses the same
 Moscati et al. (2027) calibrated range as the Cavezzo run, for a
 like-for-like comparison; Cd is held fixed. rho_m is overridden to
 Bunburra's own measured bulk density (2700 kg/m^3) via BUNBURRA_PARAMS.
+
+A Monte Carlo run is cached to CACHE_FILE after it completes; running
+this script again offers to reuse the cached samples instead of
+resimulating from scratch.
 """
 
+import os
 import time
 import warnings
 import numpy as np
@@ -38,6 +44,24 @@ SIGMA_ABL_RANGE = (7e-8, 9e-8)   # Moscati et al. (2027) calibrated range -- sam
 RANDOM_SEED = 42
 
 BUNBURRA_PARAMS = {**DEFAULT_PARAMS, "rho_m": RHO_M}
+
+# Running N_SAMPLES propagations is the expensive part of this script.
+# Once a run's raw impact scatter is on disk, there's no need to redo
+# it just to re-plot or re-check the summary numbers.
+CACHE_FILE = "mc_cache_bunburra.npz"
+
+
+def _load_cache(path):
+    """Load a previously-saved Monte Carlo result (see _save_cache)."""
+    data = np.load(path)
+    return {"lats": data["lats"], "lons": data["lons"],
+            "n_failed": int(data["n_failed"])}
+
+
+def _save_cache(path, result):
+    """Save the raw impact scatter so a later run can skip resimulating."""
+    np.savez(path, lats=result["lats"], lons=result["lons"],
+              n_failed=result["n_failed"])
 
 
 def sample_inputs(rng, n):
@@ -116,15 +140,6 @@ def run_monte_carlo(n_samples=N_SAMPLES, seed=RANDOM_SEED, verbose_every=100):
     """
     rng = np.random.default_rng(seed)
     samples = sample_inputs(rng, n_samples)
-
-    # PSI0_UNC (bunburra.py) comes from the apparent radiant uncertainty
-    # (Table 4, Spurny et al. 2012), not from differencing entry/terminal
-    # coordinates -- print the sampled distribution as a sanity check
-    # that it matches what was requested.
-    psi0_deg = np.degrees(samples["PSI0"])
-    print(f"Heading (PSI0) sampled: {np.mean(psi0_deg):.4f} deg +/- "
-          f"{np.std(psi0_deg):.4f} deg (1-sigma, from {n_samples} samples; "
-          f"source: apparent radiant uncertainty, Table 4)")
 
     lats, lons = [], []
     n_failed = 0
@@ -299,30 +314,47 @@ def plot_probability_contour(result, grid_res=200):
     fig.tight_layout()
     plt.show()
 
+    # Which HPD band does the real recovery site actually fall in? This
+    # is the validation result itself, not just a description of the plot.
+    density_at_recovery = kde(np.array([[RECOVERY_LON_DEG], [RECOVERY_LAT_DEG]]))[0]
+    if density_at_recovery >= levels[0]:
+        band = "within 1-sigma (39.3%)"
+    elif density_at_recovery >= levels[1]:
+        band = "within 2-sigma (86.5%)"
+    elif density_at_recovery >= levels[2]:
+        band = "within 3-sigma (98.9%)"
+    else:
+        band = "OUTSIDE 3-sigma (98.9%)"
+
     from plot_trajectory_bunburra import great_circle_distance
-    dists_km = np.array([
-        great_circle_distance(np.radians(la), np.radians(lo),
-                                np.radians(RECOVERY_LAT_DEG), np.radians(RECOVERY_LON_DEG)) / 1000.0
-        for la, lo in zip(lats, lons)
-    ])
-    print(f"\nDistance from real recovery location (M1), across all MC samples:")
-    print(f"  Median: {np.median(dists_km):.3f} km")
-    print(f"  Mean:   {np.mean(dists_km):.3f} km")
-    print(f"  Std:    {np.std(dists_km):.3f} km")
-    print(f"  Min:    {np.min(dists_km):.3f} km")
-    print(f"  Max:    {np.max(dists_km):.3f} km")
     nominal_dist = great_circle_distance(
         np.radians(nominal_lat), np.radians(nominal_lon),
         np.radians(RECOVERY_LAT_DEG), np.radians(RECOVERY_LON_DEG)) / 1000.0
-    print(f"  Nominal (baseline) run: {nominal_dist:.3f} km")
 
-    # Does the real recovery point fall within the predicted dispersion?
-    frac_closer = np.mean(dists_km <= nominal_dist) if len(dists_km) else float("nan")
-    print(f"\nFraction of MC samples landing at least as close to the real "
-          f"site as the single-point 5.14 km baseline miss: {frac_closer:.1%}")
+    print(f"\nNominal (baseline) impact: {nominal_lat:.5f} N, {nominal_lon:.5f} E")
+    print(f"Real recovery location (M1): {RECOVERY_LAT_DEG:.5f} N, {RECOVERY_LON_DEG:.5f} E")
+    print(f"Distance (nominal to recovery): {nominal_dist:.3f} km")
+    print(f"Real recovery point falls {band} of the Monte Carlo dispersion")
+    print(f"Samples reaching ground: {len(lats)}/{len(lats) + result['n_failed']} "
+          f"({result['n_failed']} failed)")
+
+
+def main():
+    if os.path.exists(CACHE_FILE):
+        answer = input(f"Cached Monte Carlo results found ({CACHE_FILE}). "
+                        f"Re-run simulation? [y/N]: ").strip().lower()
+        if answer == "y":
+            result = run_monte_carlo()
+            _save_cache(CACHE_FILE, result)
+        else:
+            result = _load_cache(CACHE_FILE)
+            print(f"Using cached results from {CACHE_FILE}.")
+    else:
+        print(f"Running Bunburra Rockhole Monte Carlo with N={N_SAMPLES} joint samples...")
+        result = run_monte_carlo()
+        _save_cache(CACHE_FILE, result)
+    plot_probability_contour(result)
 
 
 if __name__ == "__main__":
-    print(f"Running Bunburra Rockhole Monte Carlo with N={N_SAMPLES} joint samples...")
-    result = run_monte_carlo()
-    plot_probability_contour(result)
+    main()
