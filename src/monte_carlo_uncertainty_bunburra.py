@@ -3,7 +3,7 @@ monte_carlo_uncertainty_bunburra.py
 
 Joint Monte Carlo propagation of input uncertainty for the Bunburra
 Rockhole meteorite fall (Spurny et al., 2012) -- the project's second
-validation case. Mirrors monte_carlo_uncertainty.py's method (RK45,
+validation case. Mirrors monte_carlo_uncertainty_cavezzo.py's method (RK45,
 KDE-based probability contour) so the two falls are directly
 comparable.
 
@@ -15,7 +15,7 @@ normals using the paper's own reported (or paper-derived) 1-sigma
 values; PSI0_UNC specifically comes from the apparent radiant
 uncertainty (Table 4), not from differencing the entry/terminal
 coordinates -- see bunburra.py for why. sigma_abl reuses the same
-Moscati et al. (2027) calibrated range as the Cavezzo run, for a
+Ceplecha et al. (1998) Table VII range as the Cavezzo run, for a
 like-for-like comparison; Cd is held fixed. rho_m is overridden to
 Bunburra's own measured bulk density (2700 kg/m^3) via BUNBURRA_PARAMS.
 
@@ -40,7 +40,7 @@ from dynamics import DEFAULT_PARAMS
 from integrator import run_trajectory, impact_state
 
 N_SAMPLES = 5000
-SIGMA_ABL_RANGE = (7e-8, 9e-8)   # Moscati et al. (2027) calibrated range -- same as Cavezzo run
+SIGMA_ABL_RANGE = (1.1e-8, 1.5e-8)   # Ceplecha et al. (1998) Table VII -- same as Cavezzo run
 RANDOM_SEED = 42
 
 BUNBURRA_PARAMS = {**DEFAULT_PARAMS, "rho_m": RHO_M}
@@ -244,8 +244,7 @@ def plot_probability_contour(result, grid_res=200):
     Returns
     -------
     None
-        Saves the figure to fig_monte_carlo_bunburra_contour.png,
-        displays it, and prints summary statistics to stdout.
+        Displays the figure and prints summary statistics to stdout.
     """
     lats, lons = result["lats"], result["lons"]
 
