@@ -20,7 +20,7 @@ SCRIPTS = [
     ("Numerical methods comparison", "plot_numerical_comparison.py"),
     ("Piecewise stepping experiment", "plot_piecewise_stepping.py"),
     ("Wind drift comparison", "plot_wind_comparison.py"),
-    ("Cavezzo Monte Carlo uncertainty", "monte_carlo_uncertainty.py"),
+    ("Cavezzo Monte Carlo uncertainty", "monte_carlo_uncertainty_cavezzo.py"),
     ("Bunburra Monte Carlo uncertainty", "monte_carlo_uncertainty_bunburra.py"),
 ]
 
