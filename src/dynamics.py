@@ -39,20 +39,14 @@ R_E = 6371000.0  # mean Earth radius, m (kept consistent with gravity.py)
 # These are NOT measured quantities — they are model assumptions/
 # coefficients that must be sourced or justified separately (see
 # project brief, section 3). Defaults below are placeholders; replace
-# with values justified for your chosen meteor event (e.g. Cavezzo).
+# with values justified for the chosen meteor event (e.g. Cavezzo).
 
 DEFAULT_PARAMS = {
-    "Cd": 1.16,        # drag coefficient, dimensionless — Mach > 4 plateau
-                        # value from the Ceplecha (1987) Cd(M) curve, as
-                        # reported in Moscati et al. (2027, Icarus 461,
-                        # 117303, Fig. 1). Cavezzo's speed (4-12.2 km/s)
-                        # stays well above Mach 4 throughout the luminous
-                        # flight, so this constant is a reasonable
-                        # simplification of the full Mach-dependent curve.
-    "sigma_abl": 8.0e-8,  # ablation coefficient CH/Q, kg/J — midpoint of
-                        # the 7-9e-8 kg/J range empirically calibrated by
-                        # Moscati et al. (2027) against several real falls,
-                        # Cavezzo explicitly included among them.
+    "Cd": 0.92,        # drag coefficient, dimensionless — standard
+                        # hypersonic blunt-body value (Ceplecha et al. 1998)
+    "sigma_abl": 1.3e-8,  # ablation coefficient CH/Q, kg/J — midpoint of
+                        # the 1.1-1.5e-8 kg/J range fitted to the Lost
+                        # City fall (Ceplecha et al. 1998, Table VII)
     "rho_m": 3322.0,   # meteoroid bulk density, kg/m^3 — measured value
                         # for Cavezzo fragment F2 (Gardiol et al. 2021)
     "atmosphere_model": "table",  # "exp" or "table" — see atmosphere.py
@@ -146,8 +140,8 @@ def meteor_rhs(t, y, params=None):
     M_dot = -(p["sigma_abl"] * A * rho * V ** 3) / 2.0
     # Ablation stops once the meteor transitions to "dark flight" — the
     # velocity threshold below which luminous ablation becomes negligible
-    # (Moilanen et al. 2021, adopted by Moscati et al. 2027 as a standard
-    # operational criterion), rather than only guarding against M <= 0.
+    # (a standard modeling simplification; see report for discussion),
+    # rather than only guarding against M <= 0.
     if V < 3000.0:
         M_dot = 0.0
     elif M <= 0.0 and M_dot < 0.0:
