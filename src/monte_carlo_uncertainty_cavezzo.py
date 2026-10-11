@@ -1,31 +1,32 @@
 """
-monte_carlo_uncertainty.py
+monte_carlo_uncertainty_cavezzo.py
 
 Joint Monte Carlo propagation of input uncertainty for the Cavezzo
-meteorite fall, as distinct from the single-parameter sensitivity
-sweep in sensitivity_ablation.py: every uncertain input (V0, gamma0,
-phi0, lambda0, psi0, M0, sigma_abl) is sampled SIMULTANEOUSLY, many
-times, and propagated to an impact point. The resulting scatter is
-used to build a probability density (KDE) contour map -- the same
-style of strewn-field visualization used in Moscati et al. (2027)
-and comparable planetary-defense literature.
+meteorite fall: every uncertain input (H0, V0, gamma0, phi0, lambda0,
+psi0, M0, sigma_abl) is sampled SIMULTANEOUSLY, many times, and
+propagated to an impact point. The resulting scatter is used to build
+a probability density (KDE) contour map -- the same style of
+strewn-field visualization used in planetary-defense literature.
 
 Sampled distributions:
-    V0, gamma0, phi0, lambda0, psi0, M0 -- independent normal,
+    H0, V0, gamma0, phi0, lambda0, psi0, M0 -- independent normal,
         centred on Gardiol et al. (2021) Table 3 values, with their
         stated 1-sigma uncertainties.
-    sigma_abl -- uniform over [7e-8, 9e-8] kg/J, the calibrated range
-        from Moscati et al. (2027) (see dynamics.py DEFAULT_PARAMS
-        comment for the same citation).
+    sigma_abl -- uniform over [1.1e-8, 1.5e-8] kg/J, fitted to the
+        Lost City meteorite fall (Ceplecha et al. 1998, Table VII;
+        see dynamics.py DEFAULT_PARAMS comment for the same citation).
     Cd -- held fixed. Its uncertainty at these Mach numbers is
-        negligible compared to the other inputs (established via
-        literature check earlier in this project).
+        negligible compared to the other inputs.
 
 Output: a probability contour map (1-sigma/2-sigma/3-sigma, i.e.
 39.3%/86.5%/98.9% highest-density regions -- see hpd_levels()
 docstring for why these differ from the naive 1D 68/95/99.7% figures)
 over the impact footprint, plus the raw sample scatter, the nominal
 (baseline) impact point, and the real recovery location.
+
+A Monte Carlo run is cached to CACHE_FILE after it completes; running
+this script again offers to reuse the cached samples instead of
+resimulating from scratch.
 """
 
 import os
@@ -42,7 +43,7 @@ from dynamics import DEFAULT_PARAMS
 from integrator import run_trajectory, impact_state
 
 N_SAMPLES = 5000
-SIGMA_ABL_RANGE = (7e-8, 9e-8)   # Moscati et al. (2027) calibrated range
+SIGMA_ABL_RANGE = (1.1e-8, 1.5e-8)   # Ceplecha et al. (1998) Table VII, Lost City fit
 RANDOM_SEED = 42
 
 # Running N_SAMPLES propagations is the expensive part of this script.
@@ -66,8 +67,22 @@ def _save_cache(path, result):
 
 def sample_inputs(rng, n):
     """
-    Draw n joint samples of the uncertain inputs. Returns a dict of
-    arrays, one per parameter, all length n.
+    Draw n joint samples of the uncertain entry-state inputs.
+
+    Parameters
+    ----------
+    rng : numpy.random.Generator
+        Random number generator to draw from (keeps sampling
+        reproducible when seeded by the caller).
+    n : int
+        Number of joint samples to draw.
+
+    Returns
+    -------
+    dict[str, ndarray]
+        Keys "H0", "V0", "GAMMA0", "PHI0", "LAMBDA0", "PSI0", "M0",
+        "sigma_abl", each an array of length n holding one sampled
+        value per Monte Carlo draw.
     """
     return {
         "H0": rng.normal(H0, H0_UNC, n),
@@ -85,14 +100,34 @@ def run_monte_carlo(n_samples=N_SAMPLES, seed=RANDOM_SEED, verbose_every=100):
     """
     Run the full joint Monte Carlo propagation.
 
+    Draws n_samples joint input samples (sample_inputs), runs each one
+    forward through the reference ODE solver (RK45) to ground impact,
+    and collects the resulting impact coordinates. Samples that never
+    reach the ground within the time span are counted and excluded.
+
+    Parameters
+    ----------
+    n_samples : int, optional
+        Number of joint Monte Carlo samples to run. Default N_SAMPLES.
+    seed : int, optional
+        Seed for the random number generator, for reproducibility.
+        Default RANDOM_SEED.
+    verbose_every : int, optional
+        Print a progress line every this many samples. Set to 0 or
+        None to disable progress output. Default 100.
+
     Returns
     -------
-    dict with:
-        lats, lons : ndarray -- impact coordinates (degrees) for every
-            sample that successfully reached the ground
-        n_failed : int -- samples that did not reach the ground within
-            the time span (excluded from lats/lons)
-        samples : dict -- the raw sampled input arrays (for reference)
+    dict
+        "lats", "lons" : ndarray
+            Impact coordinates (degrees) for every sample that
+            successfully reached the ground.
+        "n_failed" : int
+            Number of samples that did not reach the ground within
+            the time span (excluded from lats/lons).
+        "samples" : dict
+            The raw sampled input arrays, as returned by
+            sample_inputs(), kept for reference/debugging.
     """
     rng = np.random.default_rng(seed)
     samples = sample_inputs(rng, n_samples)
@@ -137,16 +172,30 @@ def run_monte_carlo(n_samples=N_SAMPLES, seed=RANDOM_SEED, verbose_every=100):
 
 def hpd_levels(density_values, mass_fractions=(0.393, 0.865, 0.989)):
     """
-    Given the KDE evaluated at every sample point, find the density
-    thresholds that enclose each requested probability mass fraction
-    (highest-posterior-density regions, not naive percentile bands).
+    Find density thresholds enclosing given highest-posterior-density
+    (HPD) probability masses, for contour levels on a KDE surface.
 
-    Default fractions are the TRUE 2D Gaussian-equivalent 1-sigma,
-    2-sigma, 3-sigma enclosed probabilities (1 - exp(-n^2/2) for n =
-    1, 2, 3) -- NOT the 1D values (68.3%/95.4%/99.7%). This matches
-    the convention Gardiol et al. (2021) use for their own published
-    Cavezzo strewn-field ellipse, so the two can be compared directly
-    on a like-for-like basis.
+    Sorts the density evaluated at every sample point, then finds the
+    thresholds that enclose each requested cumulative probability
+    mass -- NOT the naive 1D 68.3/95.4/99.7% percentile bands. Default
+    mass fractions are the true 2D Gaussian-equivalent 1-sigma/
+    2-sigma/3-sigma enclosed probabilities, matching the convention
+    Gardiol et al. (2021) use for their published Cavezzo strewn-field
+    ellipse.
+
+    Parameters
+    ----------
+    density_values : ndarray
+        KDE density evaluated at each sample point.
+    mass_fractions : tuple of float, optional
+        Cumulative probability masses to find HPD thresholds for.
+        Default (0.393, 0.865, 0.989) -- 2D 1/2/3-sigma equivalents.
+
+    Returns
+    -------
+    list of float
+        Density threshold for each requested mass fraction, in the
+        same order as mass_fractions.
     """
     sorted_density = np.sort(density_values)[::-1]
     cumulative = np.cumsum(sorted_density)
@@ -161,11 +210,29 @@ def hpd_levels(density_values, mass_fractions=(0.393, 0.865, 0.989)):
 
 def plot_probability_contour(result, grid_res=200):
     """
-    KDE-based probability contour map of the Monte Carlo impact
-    scatter, with 1-sigma/2-sigma/3-sigma (39.3%/86.5%/98.9%)
-    highest-density regions, the raw sample
-    scatter, the nominal (baseline-parameter) impact point, and the
-    real recovery location.
+    Plot a KDE-based impact-probability contour map and print summary
+    validation statistics.
+
+    Builds a 2D kernel density estimate over the Monte Carlo impact
+    scatter, draws filled 1-sigma/2-sigma/3-sigma highest-posterior-
+    density contours (see hpd_levels), and marks the nominal
+    (unperturbed baseline) impact point and the real recovered
+    location for comparison. Also prints which HPD band the real
+    recovery site actually falls in.
+
+    Parameters
+    ----------
+    result : dict
+        Output of run_monte_carlo() -- must contain "lats", "lons",
+        "n_failed".
+    grid_res : int, optional
+        Number of grid points per axis for the KDE evaluation grid.
+        Default 200.
+
+    Returns
+    -------
+    None
+        Displays the figure and prints summary statistics to stdout.
     """
     lats, lons = result["lats"], result["lons"]
 
