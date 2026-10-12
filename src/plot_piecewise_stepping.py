@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
 
 from dynamics import meteor_rhs, ground_impact_event, DEFAULT_PARAMS
-from cavezzo import initial_state
+from Cavezzo import initial_state
 from fixed_step_integrators import integrate_fixed_step
 from plot_trajectory import (
     great_circle_distance,
@@ -1258,7 +1258,7 @@ def figure_uniform_vs_piecewise(piecewise_data, uniform_results):
                        label=f"{label} (uniform, whole flight)")
 
     # RK45 reference line -- NOT part of the piecewise-vs-uniform
-    # comparison (RK45 doesn't have a meaningful distinction between
+    # comparison (RK45 does not have a meaningful distinction between
     # the two, since its own adaptivity already ignores most max_step
     # caps during the fast phase regardless of what is requested) --
     # shown only for scale, with a visually distinct marker/style so it
