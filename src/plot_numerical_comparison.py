@@ -1,31 +1,28 @@
 """
 plot_numerical_comparison.py
 
-Figure A ("ground truth vs step size = 5"):
-    Left  - full-trajectory altitude vs time (0 to impact) for the
-             truth solver and RK2/RK4/RK45 all run with step size 5s
-             (for RK45, "step size 5" means max_step=5s, since it is
-             adaptive internally but capped at that maximum).
-    Right - ground track (lat/lon) for the same four, with the real
-             recovery location marked.
-    Purpose: shows, at a glance, how far a too-coarse step size (5s)
-    pushes each method from the truth solution — i.e. numerical error
-    at a deliberately under-resolved step size, distinguished from
-    physical-model error, which is evaluated separately.
+Compares RK2, RK4, and RK45 against a tight-tolerance DOP853 reference
+("truth") solution, to isolate numerical error (the gap between a
+method's result and the truth solution, with the physical model held
+identical across every run) from physical-model error.
 
-Figure B (6-panel step-size convergence grid):
-    3 columns: RK2, RK4, RK45. Step sizes tested: 20, 10, 5, 2.5, 1,
-    0.5, 0.1 (s) - for RK45 this is applied as max_step, holding rtol
-    fixed at a normal value (1e-8), so all three columns are driven by
-    the same nominal "step size" list for a fair visual comparison.
-    Top row    - altitude vs time (0-6s, luminous flight only, where
-                  step-size differences are visible) for that method
-                  at each step size, plotted against the truth curve.
-    Bottom row - resulting impact-location (lat/lon) for that method
-                  at each step size, plotted against the truth's
-                  impact point. Runs that diverge wildly are noted in
-                  the console and excluded from the scatter's axis
-                  scaling so the informative points stay legible.
+Two comparisons are produced:
+
+    - A single deliberately coarse run (step size 5s for RK2/RK4;
+      max_step=5s for RK45, since it is adaptive internally but capped
+      at that maximum) against the truth solution, over the full
+      trajectory and ground track, showing at a glance how far an
+      under-resolved step size pushes each method from the truth.
+
+    - A step-size convergence sweep across all three methods (step
+      sizes 20, 10, 5, 2.5, 1, 0.5, 0.1 s for RK2/RK4 and as max_step
+      for RK45, holding rtol fixed at a normal value of 1e-8 so all
+      three are driven by the same nominal step-size list), tracking
+      both the luminous-flight altitude profile and the resulting
+      impact location at each step size against the truth solution.
+      Runs that diverge wildly are noted and excluded from the
+      impact-location axis scaling so the informative points stay
+      legible.
 """
 
 import numpy as np
@@ -33,7 +30,7 @@ import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
 
 from dynamics import meteor_rhs, ground_impact_event, DEFAULT_PARAMS
-from cavezzo import initial_state, RECOVERY_LAT, RECOVERY_LON, \
+from Cavezzo import initial_state, RECOVERY_LAT, RECOVERY_LON, \
     RECOVERY_LAT_DEG, RECOVERY_LON_DEG
 from fixed_step_integrators import integrate_fixed_step
 from plot_trajectory import great_circle_distance
@@ -89,7 +86,7 @@ def run_rk45_capped(max_step, t_span=FULL_SPAN, rtol=1e-8):
     RK45 with a max_step CAP (not a tolerance sweep) — used only in
     Figure A, where the point is a like-for-like "same coarse step
     size as RK2/RK4" comparison, not testing RK45's own accuracy
-    limits (that's what run_rk45_tol / Figure B is for). Note: because
+    limits (that is what run_rk45_tol / Figure B is for). Note: because
     RK45 is adaptive, this cap only ever binds during the calm dark-
     flight phase for this problem -- see the max_step-vs-rtol finding
     from Figure B's own investigation.
@@ -290,7 +287,7 @@ def figure_B():
 
     # Shared bottom-row axis limits, covering every sane impact point
     # across all three methods, plus truth and the real recovery site,
-    # with a little padding so markers aren't clipped at the edge.
+    # with a little padding so markers are not clipped at the edge.
     all_impact_lons += [np.degrees(lon_truth), RECOVERY_LON_DEG]
     all_impact_lats += [np.degrees(lat_truth), RECOVERY_LAT_DEG]
     lon_min, lon_max = min(all_impact_lons), max(all_impact_lons)
