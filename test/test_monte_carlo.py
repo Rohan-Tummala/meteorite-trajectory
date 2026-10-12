@@ -97,7 +97,7 @@ def test_bunburra_sample_inputs_matches_stated_uncertainty():
 
 
 def test_cavezzo_sample_inputs_matches_stated_uncertainty():
-    from Cavezzo import H0, H0_UNC, V0, V0_UNC, M0, M0_UNC
+    from cavezzo import H0, H0_UNC, V0, V0_UNC, M0, M0_UNC
 
     rng = np.random.default_rng(1)
     samples = mc_cavezzo.sample_inputs(rng, 200_000)
@@ -206,7 +206,7 @@ def test_cavezzo_recovery_site_within_predicted_region():
 
     Expected to fail with the current, uncalibrated Cd/sigma_abl -- see
     the xfail reason above."""
-    from Cavezzo import RECOVERY_LAT_DEG, RECOVERY_LON_DEG
+    from cavezzo import RECOVERY_LAT_DEG, RECOVERY_LON_DEG
 
     cache_path = os.path.join(SRC_DIR, mc_cavezzo.CACHE_FILE)
     if not os.path.exists(cache_path):
