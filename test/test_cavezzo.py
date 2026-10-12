@@ -8,7 +8,7 @@ conversion helper and the assembled initial-state vector.
 import numpy as np
 import pytest
 
-from Cavezzo import (_dms_to_deg, initial_state,
+from cavezzo import (_dms_to_deg, initial_state,
                        H0, V0, GAMMA0, PHI0, LAMBDA0, PSI0, M0)
 
 
