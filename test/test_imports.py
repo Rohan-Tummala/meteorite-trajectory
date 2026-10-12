@@ -8,7 +8,7 @@ actual file `Cavezzo.py`) previously broke every script that imports
 the Cavezzo case on a case-sensitive filesystem (Linux), while
 working silently on a case-insensitive one (macOS/Windows). None of
 the project's other tests would have caught that, since a module
-that fails to import can't be exercised by any test inside it.
+that fails to import cannot be exercised by any test inside it.
 """
 
 import importlib
@@ -23,7 +23,7 @@ import pytest
 MODULES = [
     "atmosphere",
     "bunburra",
-    "cavezzo",
+    "Cavezzo",
     "dynamics",
     "fixed_step_integrators",
     "gravity",
