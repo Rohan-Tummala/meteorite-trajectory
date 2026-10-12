@@ -240,8 +240,8 @@ def plot_atmosphere_comparison(interp_kind="linear"):
              linewidth=2, label="Exponential model")
 
     # COESA 1976 model: the true underlying curve, evaluated directly
-    # (no interpolation). Plotted as a dashed line so it's visible even
-    # where it nearly overlaps the interpolated table below.
+    # (no interpolation). Plotted as a dashed line so it remains visible
+    # even where it nearly overlaps the interpolated table below.
     ax.plot(h_fine, coesa_density(h_fine), "--", color="tab:green",
              linewidth=2, label="COESA 1976 model (exact evaluation)")
 
