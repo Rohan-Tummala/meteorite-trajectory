@@ -221,7 +221,7 @@ def plot_atmosphere_comparison(interp_kind="linear"):
     tabulated model is drawn as markers at the actual table points
     connected by a dotted line, since that dotted line literally *is*
     the interpolated result between data points (currently linear;
-    pass interp_kind="cubic" once that's implemented to compare).
+    pass interp_kind="cubic" once that is implemented to compare).
 
     Parameters
     ----------
