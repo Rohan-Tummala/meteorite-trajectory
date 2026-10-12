@@ -111,7 +111,7 @@ def impact_state(result):
 
 
 if __name__ == "__main__":
-    # Quick manual sanity check: integrate the Cavezzo trajectory with
+    # Manual verification: integrate the Cavezzo trajectory with
     # default (moderate) tolerances over a generous time span, and
     # report whether/where it hit the ground.
     from cavezzo import initial_state

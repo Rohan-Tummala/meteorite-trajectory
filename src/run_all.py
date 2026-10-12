@@ -15,7 +15,7 @@ figures still appear in Spyder's Plots pane).
 import runpy
 
 SCRIPTS = [
-    ("Cavezzo trajectory validation", "plot_trajectory.py"),
+    ("Cavezzo trajectory validation", "plot_trajectory_cavezzo.py"),
     ("Bunburra trajectory validation", "plot_trajectory_bunburra.py"),
     ("Numerical methods comparison", "plot_numerical_comparison.py"),
     ("Piecewise stepping experiment", "plot_piecewise_stepping.py"),

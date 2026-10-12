@@ -1,14 +1,11 @@
 """
 test_imports.py
 
-Module-level smoke test: every source module must actually import
-without error on the platform pytest is run on. This exists because
-a filename-case mismatch (`from cavezzo import ...` against the
-actual file `Cavezzo.py`) previously broke every script that imports
-the Cavezzo case on a case-sensitive filesystem (Linux), while
-working silently on a case-insensitive one (macOS/Windows). None of
-the project's other tests would have caught that, since a module
-that fails to import cannot be exercised by any test inside it.
+Module-level smoke test: every source module must import cleanly on
+the platform pytest is run on. A module that fails to import cannot
+be exercised by any other test in the suite, so this check runs
+independently of, and before, the tests that exercise each module's
+actual functions.
 """
 
 import importlib
@@ -23,7 +20,7 @@ import pytest
 MODULES = [
     "atmosphere",
     "bunburra",
-    "Cavezzo",
+    "cavezzo",
     "dynamics",
     "fixed_step_integrators",
     "gravity",

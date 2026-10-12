@@ -48,7 +48,7 @@ BUNBURRA_PARAMS = {**DEFAULT_PARAMS, "rho_m": RHO_M}
 # Running N_SAMPLES propagations is the expensive part of this script.
 # Once a run's raw impact scatter is on disk, there is no need to redo
 # it just to re-plot or re-check the summary numbers.
-CACHE_FILE = "mc_cache_bunburra.npz"
+CACHE_FILE = "data/mc_cache_bunburra.npz"
 
 
 def _load_cache(path):

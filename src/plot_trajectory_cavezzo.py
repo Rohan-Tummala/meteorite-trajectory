@@ -1,5 +1,5 @@
 """
-plot_trajectory.py
+plot_trajectory_cavezzo.py
 
 Runs the Cavezzo trajectory and plots:
     1. Altitude vs. time
@@ -23,7 +23,7 @@ from cavezzo import initial_state, RECOVERY_LAT, RECOVERY_LON, \
 
 # Digitized reference points from Fig. 4a of Gardiol et al. (2021),
 # via WebPlotDigitizer. Update this path if the filename differs.
-DIGITIZED_FILE = "cavezzo_height_vs_time.csv"
+DIGITIZED_FILE = "data/cavezzo_height_vs_time.csv"
 
 
 def great_circle_distance(lat1, lon1, lat2, lon2, R=6371000.0):
@@ -145,7 +145,7 @@ def plot_full_trajectory():
 
 # Digitized reference points from Fig. 4c of Gardiol et al. (2021),
 # via WebPlotDigitizer. Update this path if the filename differs.
-DIGITIZED_VELOCITY_FILE = "cavezzo_vel_vs_time.xlsx"
+DIGITIZED_VELOCITY_FILE = "data/cavezzo_vel_vs_time.csv"
 
 
 def load_digitized_velocity(path):

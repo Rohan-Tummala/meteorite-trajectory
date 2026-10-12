@@ -49,7 +49,7 @@ _WIND_BEARING_DEG = _TRAVEL_HEADING_DEG + 45.0
 _WIND_BEARING_RAD = np.radians(_WIND_BEARING_DEG)
 
 # Wind speed profile: altitude (m) -> speed (m/s), from Fig. 5 /
-# Section 3.4. The h=0 point is NOT from the paper - it's an assumed
+# Section 3.4. The h=0 point is not from the paper; it is an assumed
 # taper to a small residual value, since the paper only states "below
 # 10 m/s from 13 km downwards" without giving the exact ground value.
 _WIND_ALT_M = np.array([0.0, 13000.0, 20000.0, 22000.0])

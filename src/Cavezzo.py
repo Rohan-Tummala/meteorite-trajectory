@@ -145,7 +145,7 @@ RHO_M = 3322.0
 
 # Ablation coefficient, s^2/km^2 (paper's own fitted value — useful as
 # an independent cross-check, NOT a direct input to CH/Q in this
-# model, since it's defined differently; see Ceplecha 1987 formulation)
+# model, since it is defined differently; see Ceplecha 1987 formulation)
 ABLATION_COEFF_PAPER = 0.012
 ABLATION_COEFF_PAPER_UNC = 0.003
 

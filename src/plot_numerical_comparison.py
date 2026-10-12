@@ -30,10 +30,10 @@ import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
 
 from dynamics import meteor_rhs, ground_impact_event, DEFAULT_PARAMS
-from Cavezzo import initial_state, RECOVERY_LAT, RECOVERY_LON, \
+from cavezzo import initial_state, RECOVERY_LAT, RECOVERY_LON, \
     RECOVERY_LAT_DEG, RECOVERY_LON_DEG
 from fixed_step_integrators import integrate_fixed_step
-from plot_trajectory import great_circle_distance
+from plot_trajectory_cavezzo import great_circle_distance
 
 params = DEFAULT_PARAMS
 FULL_SPAN = (0.0, 600.0)

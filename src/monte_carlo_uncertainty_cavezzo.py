@@ -36,7 +36,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 
-from Cavezzo import (H0, H0_UNC, V0, V0_UNC, GAMMA0, GAMMA0_UNC, PHI0, PHI0_UNC,
+from cavezzo import (H0, H0_UNC, V0, V0_UNC, GAMMA0, GAMMA0_UNC, PHI0, PHI0_UNC,
                        LAMBDA0, LAMBDA0_UNC, PSI0, PSI0_UNC, M0, M0_UNC,
                        RECOVERY_LAT_DEG, RECOVERY_LON_DEG, initial_state)
 from dynamics import DEFAULT_PARAMS
@@ -49,7 +49,7 @@ RANDOM_SEED = 42
 # Running N_SAMPLES propagations is the expensive part of this script.
 # Once a run's raw impact scatter is on disk, there is no need to redo
 # it just to re-plot or re-check the summary numbers.
-CACHE_FILE = "mc_cache_cavezzo.npz"
+CACHE_FILE = "data/mc_cache_cavezzo.npz"
 
 
 def _load_cache(path):
@@ -263,9 +263,9 @@ def plot_probability_contour(result, grid_res=200):
     fig, ax = plt.subplots(figsize=(9, 8))
 
     # Raw sample scatter drawn FIRST (low zorder) and smaller/fainter,
-    # so it does not wash out the contour fill sitting on top of it --
-    # with 5000 points the dots alone were dense enough to obscure the
-    # (previously too-pale) shading underneath.
+    # so it does not wash out the contour fill shading sitting on top
+    # of it: at 5000 points the dots alone are dense enough to obscure
+    # that shading if drawn at full size or opacity.
     ax.scatter(lons, lats, s=2.5, color="black", alpha=0.08,
                 label="MC samples", zorder=1)
 
@@ -326,7 +326,7 @@ def plot_probability_contour(result, grid_res=200):
     else:
         band = "OUTSIDE 3-sigma (98.9%)"
 
-    from plot_trajectory import great_circle_distance
+    from plot_trajectory_cavezzo import great_circle_distance
     nominal_dist = great_circle_distance(
         np.radians(nominal_lat), np.radians(nominal_lon),
         np.radians(RECOVERY_LAT_DEG), np.radians(RECOVERY_LON_DEG)) / 1000.0

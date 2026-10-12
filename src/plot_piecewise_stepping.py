@@ -25,9 +25,9 @@ import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
 
 from dynamics import meteor_rhs, ground_impact_event, DEFAULT_PARAMS
-from Cavezzo import initial_state
+from cavezzo import initial_state
 from fixed_step_integrators import integrate_fixed_step
-from plot_trajectory import (
+from plot_trajectory_cavezzo import (
     great_circle_distance,
     RECOVERY_LAT,
     RECOVERY_LON,
@@ -1225,44 +1225,25 @@ def figure_uniform_vs_piecewise(piecewise_data, uniform_results):
     directly whether piecewise stepping saves computation for the
     same accuracy, or whether it costs accuracy to do so.
 
-    Piecewise points: circles. Uniform points: squares (same color
-    per method, different marker so the two are easy to tell apart
-    on the same axes).
+    One panel per method (RK2, RK4, Implicit Euler, Implicit Heun),
+    rather than all methods on a single axis: with four methods each
+    contributing a piecewise and a uniform series, a single shared
+    axis becomes difficult to read, and the comparison that matters is
+    within each method (piecewise vs. uniform), not directly across
+    methods. Piecewise points: circles, labelled by their (fine,
+    coarse) step-size pair. Uniform points: squares, labelled by their
+    single step size. The RK45 reference line is repeated on every
+    panel, for scale only -- RK45 does not have a meaningful
+    distinction between piecewise and uniform stepping, since its own
+    adaptivity already ignores most max_step caps during the fast
+    phase regardless of what is requested.
     """
-    fig, ax = plt.subplots(figsize=(9, 7))
+    methods = [label for label in uniform_results.keys()]
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    axes = axes.ravel()
 
-    # Piecewise points (existing results)
-    for method_data in piecewise_data["results_by_method"]:
-        label = method_data["label"]
-        if label == "RK45":
-            continue  # adaptive; not a fair comparison to a fixed uniform step
-        color = METHOD_COLORS.get(label, "gray")
-        rows = [(e["runtime_s"], e["impact_error"])
-                for e in method_data["entries"]
-                if e["status"] == "OK" and e["impact_error"] is not None]
-        if rows:
-            rows.sort()
-            times, errs = zip(*rows)
-            ax.loglog(times, errs, "o-", color=color, markersize=8,
-                       label=f"{label} (piecewise)")
-
-    # Uniform points (new results)
-    for label, entries in uniform_results.items():
-        color = METHOD_COLORS.get(label, "gray")
-        rows = [(e["runtime_s"], e["impact_error"]) for e in entries
-                if e["status"] == "OK" and e["impact_error"] is not None]
-        if rows:
-            rows.sort()
-            times, errs = zip(*rows)
-            ax.loglog(times, errs, "s--", color=color, markersize=10,
-                       label=f"{label} (uniform, whole flight)")
-
-    # RK45 reference line -- NOT part of the piecewise-vs-uniform
-    # comparison (RK45 does not have a meaningful distinction between
-    # the two, since its own adaptivity already ignores most max_step
-    # caps during the fast phase regardless of what is requested) --
-    # shown only for scale, with a visually distinct marker/style so it
-    # does not imply a third "mode" alongside piecewise/uniform.
+    # RK45 reference series, shared across every panel.
+    rk45_times, rk45_errs = [], []
     for method_data in piecewise_data["results_by_method"]:
         if method_data["label"] != "RK45":
             continue
@@ -1271,15 +1252,56 @@ def figure_uniform_vs_piecewise(piecewise_data, uniform_results):
                 if e["status"] == "OK" and e["impact_error"] is not None]
         if rows:
             rows.sort()
-            times, errs = zip(*rows)
-            ax.loglog(times, errs, "^:", color="tab:blue", markersize=9,
-                       alpha=0.7, label="RK45 (reference, for scale only)")
+            rk45_times, rk45_errs = zip(*rows)
 
-    ax.set_xlabel("Computation time (s)")
-    ax.set_ylabel("Impact-location error vs. reference (m)")
-    ax.set_title("Piecewise stepping vs. uniform fine step (whole flight)")
-    ax.grid(True, which="both", linestyle="--", alpha=0.4)
-    ax.legend(fontsize=9)
+    for ax, label in zip(axes, methods):
+        color = METHOD_COLORS.get(label, "gray")
+
+        # Piecewise points for this method.
+        piecewise_entries = next(
+            (m["entries"] for m in piecewise_data["results_by_method"]
+             if m["label"] == label), []
+        )
+        rows = [(e["runtime_s"], e["impact_error"], e["dt_fine"], e["dt_coarse"])
+                for e in piecewise_entries
+                if e["status"] == "OK" and e["impact_error"] is not None]
+        if rows:
+            rows.sort()
+            times, errs, dt_fines, dt_coarses = zip(*rows)
+            ax.loglog(times, errs, "o-", color=color, markersize=8,
+                       label=f"{label} (piecewise)")
+            for t_val, err_val, dt_fine, dt_coarse in zip(times, errs, dt_fines, dt_coarses):
+                ax.annotate(f"{dt_fine:g}/{dt_coarse:g}s", (t_val, err_val),
+                             fontsize=6, xytext=(4, 4),
+                             textcoords="offset points", alpha=0.7)
+
+        # Uniform points for this method.
+        rows = [(e["runtime_s"], e["impact_error"], e["dt"])
+                for e in uniform_results[label]
+                if e["status"] == "OK" and e["impact_error"] is not None]
+        if rows:
+            rows.sort()
+            times, errs, dts = zip(*rows)
+            ax.loglog(times, errs, "s--", color=color, markersize=10,
+                       label=f"{label} (uniform, whole flight)")
+            for t_val, err_val, dt in zip(times, errs, dts):
+                ax.annotate(f"{dt:g}s", (t_val, err_val), fontsize=6,
+                             xytext=(4, -10), textcoords="offset points",
+                             alpha=0.7)
+
+        if rk45_times:
+            ax.loglog(rk45_times, rk45_errs, "^:", color="tab:blue",
+                       markersize=8, alpha=0.6,
+                       label="RK45 (reference, for scale only)")
+
+        ax.set_xlabel("Computation time (s)")
+        ax.set_ylabel("Impact-location error vs. reference (m)")
+        ax.set_title(label)
+        ax.grid(True, which="both", linestyle="--", alpha=0.4)
+        ax.legend(fontsize=8)
+
+    fig.suptitle("Piecewise stepping vs. uniform fine step (whole flight)",
+                  fontsize=14)
     plt.tight_layout()
     plt.show()
 
@@ -1324,6 +1346,9 @@ def figure_computation_time(data):
 
         for t_val, err_val, dt_coarse in zip(times, impact_errs, dt_coarses):
             axes[0].annotate(f"{dt_coarse:g}s", (t_val, err_val), fontsize=6,
+                               xytext=(4, 4), textcoords="offset points", alpha=0.7)
+        for t_val, err_val, dt_coarse in zip(times, height_errs, dt_coarses):
+            axes[1].annotate(f"{dt_coarse:g}s", (t_val, err_val), fontsize=6,
                                xytext=(4, 4), textcoords="offset points", alpha=0.7)
 
     axes[0].set_xlabel("Computation time (s)")
