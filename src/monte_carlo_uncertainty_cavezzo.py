@@ -36,7 +36,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 
-from cavezzo import (H0, H0_UNC, V0, V0_UNC, GAMMA0, GAMMA0_UNC, PHI0, PHI0_UNC,
+from Cavezzo import (H0, H0_UNC, V0, V0_UNC, GAMMA0, GAMMA0_UNC, PHI0, PHI0_UNC,
                        LAMBDA0, LAMBDA0_UNC, PSI0, PSI0_UNC, M0, M0_UNC,
                        RECOVERY_LAT_DEG, RECOVERY_LON_DEG, initial_state)
 from dynamics import DEFAULT_PARAMS
@@ -47,7 +47,7 @@ SIGMA_ABL_RANGE = (1.1e-8, 1.5e-8)   # Ceplecha et al. (1998) Table VII, Lost Ci
 RANDOM_SEED = 42
 
 # Running N_SAMPLES propagations is the expensive part of this script.
-# Once a run's raw impact scatter is on disk, there's no need to redo
+# Once a run's raw impact scatter is on disk, there is no need to redo
 # it just to re-plot or re-check the summary numbers.
 CACHE_FILE = "mc_cache_cavezzo.npz"
 
@@ -263,7 +263,7 @@ def plot_probability_contour(result, grid_res=200):
     fig, ax = plt.subplots(figsize=(9, 8))
 
     # Raw sample scatter drawn FIRST (low zorder) and smaller/fainter,
-    # so it doesn't wash out the contour fill sitting on top of it --
+    # so it does not wash out the contour fill sitting on top of it --
     # with 5000 points the dots alone were dense enough to obscure the
     # (previously too-pale) shading underneath.
     ax.scatter(lons, lats, s=2.5, color="black", alpha=0.08,
@@ -286,7 +286,7 @@ def plot_probability_contour(result, grid_res=200):
              markersize=18, markeredgecolor="black",
              label="Real recovery location", zorder=6)
 
-    # Manual legend entries for the HPD bands (contourf doesn't auto-label).
+    # Manual legend entries for the HPD bands (contourf does not auto-label).
     # Labelled by 2D-equivalent sigma (39.3%/86.5%/98.9% enclosed
     # probability), matching Gardiol et al.'s own 1-sigma/3-sigma
     # convention for the published Cavezzo strewn-field ellipse.
@@ -307,7 +307,7 @@ def plot_probability_contour(result, grid_res=200):
     # equal-scaling the lon/lat axes makes the (genuinely very elongated)
     # dispersion ellipse render as an unreadably thin sliver. Auto aspect
     # keeps the plot legible; the title note above flags that the axes are
-    # not geographically true-scaled, so the shape shouldn't be read as the
+    # not geographically true-scaled, so the shape should not be read as the
     # real aspect ratio of the footprint on the ground.
     ax.grid(True, linestyle="--", alpha=0.3)
 
