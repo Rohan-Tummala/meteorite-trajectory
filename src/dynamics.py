@@ -138,10 +138,11 @@ def meteor_rhs(t, y, params=None):
     psi_dot = 0.0
 
     M_dot = -(p["sigma_abl"] * A * rho * V ** 3) / 2.0
-    # Ablation stops once the meteor transitions to "dark flight" — the
-    # velocity threshold below which luminous ablation becomes negligible
-    # (a standard modeling simplification; see report for discussion),
-    # rather than only guarding against M <= 0.
+    # Ablation stops once the meteor transitions to "dark flight": below
+    # this velocity threshold, luminous ablation becomes negligible and
+    # mass loss by vaporization effectively ceases. This is a standard
+    # modeling simplification, applied here in addition to guarding
+    # against M <= 0.
     if V < 3000.0:
         M_dot = 0.0
     elif M <= 0.0 and M_dot < 0.0:
