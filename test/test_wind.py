@@ -44,7 +44,7 @@ def test_wind_speed_handles_array_input():
 def test_wind_components_magnitude_matches_wind_speed():
     """The (north, east) components must recombine, via Pythagoras,
     to the same magnitude as wind_speed -- i.e. the decomposition
-    doesn't silently lose or add energy."""
+    does not silently lose or add energy."""
     h = 18000.0
     W_north, W_east = wind_components(h)
     magnitude = np.sqrt(W_north ** 2 + W_east ** 2)
