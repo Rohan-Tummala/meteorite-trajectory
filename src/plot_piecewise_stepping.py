@@ -74,7 +74,7 @@ RK45_RTOL = 1e-8
 RK45_ATOL = 1e-10
 
 # Threshold used only to decide whether a numerical trajectory has become
-# obviously non-physical / numerically unstable.
+# non-physical / numerically unstable.
 HEIGHT_LIMIT_KM = 1e5
 
 # Colours used consistently across the summary/time plots.
@@ -299,7 +299,7 @@ def figure_stability_timescale(data, n_points=300):
     Plot the rigorous local stability timescale tau(t) along the whole
     reference trajectory, alongside horizontal reference lines for
     every distinct step size tested elsewhere in this file (PAIRS'
-    fine/coarse values, UNIFORM_STEP_SIZES) -- so it's directly
+    fine/coarse values, UNIFORM_STEP_SIZES) -- so it is directly
     visible which tested step sizes sit above tau(t) (unstable there)
     versus below it (safe there), and exactly where that crossover
     happens.
@@ -1260,9 +1260,9 @@ def figure_uniform_vs_piecewise(piecewise_data, uniform_results):
     # RK45 reference line -- NOT part of the piecewise-vs-uniform
     # comparison (RK45 doesn't have a meaningful distinction between
     # the two, since its own adaptivity already ignores most max_step
-    # caps during the fast phase regardless of what's requested) --
-    # shown only for scale, with a visually distinct marker/style so
-    # it's clearly not implying a third "mode" alongside piecewise/uniform.
+    # caps during the fast phase regardless of what is requested) --
+    # shown only for scale, with a visually distinct marker/style so it
+    # does not imply a third "mode" alongside piecewise/uniform.
     for method_data in piecewise_data["results_by_method"]:
         if method_data["label"] != "RK45":
             continue
