@@ -1,10 +1,9 @@
 """
 numerical_methods_comparison.py
 
-The core numerical-methods investigation from the project brief
-(section 8): compare how much the predicted impact point changes
-with integration method and step size, and at what computational
-cost.
+The core numerical-methods investigation: compare how much the
+predicted impact point changes with integration method and step
+size, and at what computational cost.
 
 Two families compared:
     - Fixed-step RK2 (Heun) and RK4 (classical), at several step
