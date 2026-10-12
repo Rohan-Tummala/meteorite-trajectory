@@ -402,8 +402,7 @@ def R_rk4(z):
 
 def R_implicit_euler(z):
     """
-    Stability function of backward (implicit) Euler: R(z) = 1/(1-z)
-    (Week 9.3.3, Eq. in terms of lambda*h rather than z, same object).
+    Stability function of backward (implicit) Euler: R(z) = 1/(1-z).
     A genuine rational function (Q(z)=1-z != 1), unlike the explicit
     methods above -- which is exactly why it stays bounded as z -> -inf
     (|R(z)| -> 0) instead of blowing up like a polynomial does.
@@ -413,8 +412,8 @@ def R_implicit_euler(z):
 
 def R_implicit_heun(z):
     """
-    Stability function of the implicit (trapezoidal) Heun method
-    (Week 9 Workbook, Activity 2B): R(z) = (1 + z/2)/(1 - z/2).
+    Stability function of the implicit (trapezoidal) Heun method:
+    R(z) = (1 + z/2)/(1 - z/2).
 
     A-stable like implicit Euler (|R(z)|<=1 for all Re(z)<=0, so never
     unstable), but NOT L-stable: |R(z)| -> 1 as z -> -infinity, instead
@@ -426,7 +425,7 @@ def R_implicit_heun(z):
     return (1.0 + z / 2.0) / (1.0 - z / 2.0)
 
 
-# Sanity check: the generic stage-recursion formula, applied to the
+# Verification: the generic stage-recursion formula, applied to the
 # classical RK4 Butcher tableau, must reproduce the closed-form
 # polynomial above exactly -- confirms rk_stability_function() itself
 # is correct before trusting it for RK45's (much less familiar) tableau.
@@ -546,7 +545,7 @@ def path_is_sane(
     bound_deg=90,
 ):
     """
-    Basic numerical sanity check.
+    Numerical validity check on an integrated path.
 
     Returns False if:
         - NaNs/infinities occur
@@ -685,12 +684,11 @@ def compute_piecewise_results():
     # local-linear sense), it can take coarse steps RK2/RK4/RK45 simply
     # cannot survive -- these extra pairs are what actually demonstrates
     # that advantage in the computation-time vs. impact-error plot,
-    # rather than just asserting it. 20.0s was found by hand to be
+    # rather than only asserting it. 20.0 s was found empirically to be
     # about where the step is still both Newton-stable and physically
-    # sane for this trajectory; 50.0s+ already produces nonphysical
+    # valid for this trajectory; 50.0 s+ already produces nonphysical
     # (even negative) velocities despite "converging" -- unconditional
-    # *stability* is not the same as *accuracy*, exactly the point
-    # Week 9.3 makes.
+    # stability is not the same as accuracy.
     IMPLICIT_EXTRA_PAIRS = [(0.5, 10.0), (0.5, 15.0), (0.5, 20.0)]
 
     methods = [
