@@ -8,10 +8,9 @@ Runs the Cavezzo trajectory and plots:
        location both marked, plus the distance between them
     3. Mass vs. time
 
-This is the first "does the whole picture make sense" check — not
-yet a formal validation (that comes once Cd/sigma_abl are properly
-justified/tuned), just a visual sanity check tying everything
-together.
+This is a preliminary consistency check — not yet a formal validation
+(that comes once Cd/sigma_abl are properly justified/tuned), just a
+visual check tying everything together.
 """
 
 import numpy as np
