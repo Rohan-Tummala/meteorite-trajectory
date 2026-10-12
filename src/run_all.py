@@ -5,7 +5,7 @@ Runs the project's deliverable scripts in sequence (trajectory
 validation for both falls, numerical-methods comparison, piecewise
 stepping, wind comparison, and both Monte Carlo runs). Excludes
 sensitivity_ablation.py and the core physics/data modules, which
-aren't standalone deliverables.
+are not standalone deliverables.
 
 Each script runs in-process via runpy, not as a subprocess, so
 plt.show() behaves the same as running the file on its own (e.g.
