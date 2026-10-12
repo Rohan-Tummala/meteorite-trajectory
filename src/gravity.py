@@ -9,8 +9,8 @@ Baseline model: spherical Earth, inverse-square falloff with altitude.
 
 A non-spherical (J2-corrected) model can be added later as a second
 function with the same signature, following the same pattern as
-atmosphere.py's exponential/tabulated dispatcher, for the gravity-model
-sensitivity comparison in the project brief.
+atmosphere.py's exponential/tabulated dispatcher, to support a
+gravity-model sensitivity comparison.
 """
 
 import numpy as np
@@ -69,7 +69,7 @@ def gravity(h, model="spherical"):
 
 
 if __name__ == "__main__":
-    # Quick manual sanity check when running this file directly.
+    # Manual verification when running this file directly.
     test_altitudes = [0, 10000, 21500, 50000, 85000]
     for h in test_altitudes:
         print(f"h={h:>6} m  g={gravity(h):.6f} m/s^2")
