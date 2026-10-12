@@ -7,6 +7,7 @@ and the ground-impact event extraction.
 
 import numpy as np
 import pytest
+from scipy.integrate import solve_ivp
 
 from integrator import run_trajectory, impact_state
 from dynamics import meteor_rhs
@@ -77,3 +78,39 @@ def test_impact_state_returns_none_when_never_reaches_ground():
     y0 = _simple_falling_state()
     result = run_trajectory(y0, (0.0, 0.01))  # far too short to land
     assert impact_state(result) is None
+
+
+# ---------------------------------------------------------------------
+# Accuracy of the underlying adaptive method against a known solution
+# ---------------------------------------------------------------------
+#
+# run_trajectory() is hardcoded to meteor_rhs, so its accuracy cannot be
+# checked directly against a simple closed-form problem the way the
+# hand-written fixed-step methods are in test_fixed_step_integrators.py.
+# This test instead validates the same adaptive engine run_trajectory
+# relies on -- scipy.integrate.solve_ivp with method="RK45" -- against
+# the exact solution of dy/dt = -y, y(0) = 1, y(t) = exp(-t), closing
+# the same known-solution validation gap for the adaptive method that
+# the fixed-step methods already have.
+
+def _decay_rhs(t, y):
+    """dy/dt = -y, exact solution y(t) = y0 * exp(-t)."""
+    return -y
+
+
+def test_rk45_matches_exact_solution_on_decay_problem():
+    """At tight tolerances, RK45 (the default method used throughout
+    run_trajectory) should reproduce the exact solution of a simple
+    decay problem to well within its own requested tolerance."""
+    y0 = np.array([1.0])
+    t_span = (0.0, 5.0)
+    rtol, atol = 1e-10, 1e-12
+
+    result = solve_ivp(_decay_rhs, t_span, y0, method="RK45",
+                        rtol=rtol, atol=atol, dense_output=True)
+
+    assert result.success
+    t_check = np.linspace(0.0, 5.0, 50)
+    y_numeric = result.sol(t_check)[0]
+    y_exact = np.exp(-t_check)
+    assert np.allclose(y_numeric, y_exact, rtol=1e-6, atol=1e-8)
