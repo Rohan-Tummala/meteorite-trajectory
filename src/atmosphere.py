@@ -266,7 +266,7 @@ def plot_atmosphere_comparison(interp_kind="linear"):
 
 
 if __name__ == "__main__":
-    # Quick manual sanity check when running this file directly.
+    # Manual verification when running this file directly.
     test_altitudes = [0, 10000, 21500, 50000]
     for h in test_altitudes:
         print(f"h={h:>6} m  exp={density(h, 'exp'):.6e} kg/m^3  "
