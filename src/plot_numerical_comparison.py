@@ -11,8 +11,7 @@ Figure A ("ground truth vs step size = 5"):
     Purpose: shows, at a glance, how far a too-coarse step size (5s)
     pushes each method from the truth solution — i.e. numerical error
     at a deliberately under-resolved step size, distinguished from
-    physical-model error (which is a separate investigation, e.g.
-    sensitivity_ablation.py).
+    physical-model error, which is evaluated separately.
 
 Figure B (6-panel step-size convergence grid):
     3 columns: RK2, RK4, RK45. Step sizes tested: 20, 10, 5, 2.5, 1,
@@ -191,7 +190,7 @@ def figure_A():
              color="black", linewidth=2, label="Truth")
 
     def latlon_sane(lat_rad, lon_rad):
-        """Final-point physical sanity check (kept for the impact marker)."""
+        """Final-point physical validity check (kept for the impact marker)."""
         return lat_rad is not None and abs(np.degrees(lat_rad)) <= 90 and abs(np.degrees(lon_rad)) <= 180
 
     rk2_sane = latlon_sane(lat_rk2, lon_rk2) and path_is_sane(rk2["y"])
