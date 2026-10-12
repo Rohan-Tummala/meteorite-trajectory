@@ -17,8 +17,8 @@ State vector (7 elements):
     psi    heading/azimuth, rad
     M      remaining mass, kg
 
-Equations of motion follow the project brief's simplified 3D
-point-mass meteor model with drag and ablation.
+Equations of motion follow a simplified 3D point-mass meteor model
+with drag and ablation.
 """
 
 import numpy as np
@@ -37,9 +37,9 @@ R_E = 6371000.0  # mean Earth radius, m (kept consistent with gravity.py)
 # Physical/model parameters
 # ---------------------------------------------------------------------
 # These are NOT measured quantities — they are model assumptions/
-# coefficients that must be sourced or justified separately (see
-# project brief, section 3). Defaults below are placeholders; replace
-# with values justified for the chosen meteor event (e.g. Cavezzo).
+# coefficients that must be sourced and justified separately. Defaults
+# below are placeholders; replace with values justified for the
+# chosen meteor event (e.g. Cavezzo).
 
 DEFAULT_PARAMS = {
     "Cd": 0.92,        # drag coefficient, dimensionless — standard
@@ -170,8 +170,8 @@ ground_impact_event.direction = -1
 
 
 if __name__ == "__main__":
-    # Quick manual sanity check: one RHS evaluation at a plausible
-    # mid-flight state, using default parameters.
+    # Manual verification: one RHS evaluation at a plausible mid-flight
+    # state, using default parameters.
     y_test = np.array([
         30000.0,             # h, m
         10000.0,             # V, m/s
