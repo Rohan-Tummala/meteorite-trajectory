@@ -23,7 +23,7 @@ import pytest
 MODULES = [
     "atmosphere",
     "bunburra",
-    "Cavezzo",
+    "cavezzo",
     "dynamics",
     "fixed_step_integrators",
     "gravity",
