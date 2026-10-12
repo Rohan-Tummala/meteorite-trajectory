@@ -1,20 +1,19 @@
 """
 fixed_step_integrators.py
 
-scipy.integrate.solve_ivp only offers ADAPTIVE methods (RK23, RK45,
-DOP853, etc.) — there is no built-in fixed-step-size RK2 or RK4.
-Since the project explicitly wants to compare fixed step size vs.
-accuracy (how much does the solution change as dt decreases?), this
+scipy.integrate.solve_ivp only provides adaptive methods (RK23, RK45,
+DOP853, etc.); there is no built-in fixed-step-size RK2 or RK4. This
 module implements classical fixed-step RK2 (Heun's method), RK4, and
-implicit (backward) Euler by hand.
+implicit (backward) Euler by hand, to compare how step size trades
+off against accuracy as dt decreases.
 
-Implicit Euler is included specifically because it is unconditionally
-stable (Week 9.3 notes): unlike RK2/RK4, it has no step-size ceiling
-set by the local Jacobian eigenvalues, so it can take much larger
-steps in the calmer dark-flight phase without going unstable -- the
-trade-off being its 1st-order accuracy, which the computation-time
-vs. impact-error comparison in plot_piecewise_stepping.py is meant to
-quantify directly, rather than just asserting it.
+Implicit Euler is included because it is unconditionally stable:
+unlike RK2/RK4, it has no step-size ceiling set by the local Jacobian
+eigenvalues, so it can take much larger steps during the calmer
+dark-flight phase without going unstable. The trade-off is its
+1st-order accuracy, which the computation-time vs. impact-error
+comparison in plot_piecewise_stepping.py quantifies directly rather
+than only asserting.
 
 Both integrators support a simple ground-impact event: after each
 step, if altitude (state index 0) has crossed zero, the exact
@@ -77,14 +76,13 @@ def _finite_diff_jacobian(f, t, y, eps_rel=1e-6):
 
 def implicit_euler_step(f, t, y, dt, newton_tol=1e-8, max_newton_iter=10):
     """
-    One step of backward (implicit) Euler, solved by Newton's method --
-    following Week 9.3.4 of the course notes directly, extended from a
-    scalar y to a state vector.
+    One step of backward (implicit) Euler, solved by Newton's method,
+    extended from a scalar y to a state vector.
 
     y_{n+1} is defined implicitly as the root of
         F(y_{n+1}) = y_{n+1} - y_n - dt*f(t_{n+1}, y_{n+1}) = 0.
-    Newton's method (9.3.4, Eq. 9.18) linearises F about a guess and
-    solves for the correction. For a vector F, the scalar
+    Newton's method linearises F about a guess and solves for the
+    correction. For a vector F, the scalar
     f'(y)-division becomes a linear solve with F's own Jacobian
     (I - dt*J), where J = df/dy:
         (I - dt*J)*delta = -F(y_guess),   y_guess <- y_guess + delta.
@@ -126,8 +124,7 @@ def implicit_euler_step(f, t, y, dt, newton_tol=1e-8, max_newton_iter=10):
 
 def implicit_heun_step(f, t, y, dt, newton_tol=1e-8, max_newton_iter=10):
     """
-    One step of the implicit (trapezoidal) Heun method -- Week 9
-    Workbook, Activity 2B:
+    One step of the implicit (trapezoidal) Heun method:
         y_{n+1} = y_n + (h/2)*[f(t_n, y_n) + f(t_{n+1}, y_{n+1})]
 
     2nd-order accurate (unlike implicit Euler's 1st order) and
