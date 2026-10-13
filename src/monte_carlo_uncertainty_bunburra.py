@@ -105,7 +105,7 @@ def sample_inputs(rng, n):
     }
 
 
-def run_monte_carlo(n_samples=N_SAMPLES, seed=RANDOM_SEED, verbose_every=100):
+def run_monte_carlo(n_samples=N_SAMPLES, seed=RANDOM_SEED):
     """
     Run the joint Monte Carlo propagation for Bunburra Rockhole.
 
@@ -121,9 +121,6 @@ def run_monte_carlo(n_samples=N_SAMPLES, seed=RANDOM_SEED, verbose_every=100):
     seed : int, optional
         Seed for the random number generator, for reproducibility.
         Default RANDOM_SEED.
-    verbose_every : int, optional
-        Print a progress line every this many samples. Set to 0 or
-        None to disable progress output. Default 100.
 
     Returns
     -------
@@ -163,11 +160,6 @@ def run_monte_carlo(n_samples=N_SAMPLES, seed=RANDOM_SEED, verbose_every=100):
                 lons.append(np.degrees(y_impact[4]))
             else:
                 n_failed += 1
-
-            if verbose_every and (i + 1) % verbose_every == 0:
-                elapsed = time.perf_counter() - t0
-                print(f"  {i+1}/{n_samples} samples "
-                      f"({elapsed:.1f}s elapsed, {n_failed} failed so far)")
 
     elapsed = time.perf_counter() - t0
     print(f"\nDone: {len(lats)}/{n_samples} samples reached ground "

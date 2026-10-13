@@ -116,7 +116,7 @@ def coesa_density(h):
     ----------
     h : float or array_like
         Geometric altitude above sea level, in metres. Valid up to
-        ~86,000 m; values above this raise a warning and are clipped.
+        ~86,000 m; values above this are silently clipped.
 
     Returns
     -------
@@ -124,9 +124,6 @@ def coesa_density(h):
         Atmospheric density in kg/m^3.
     """
     h = np.asarray(h, dtype=float)
-    if np.any(h > _COESA_MAX_GEOMETRIC_M):
-        print(f"Warning: COESA 1976 equations are only valid up to "
-              f"{_COESA_MAX_GEOMETRIC_M} m geometric altitude — clipping.")
     h_clipped = np.clip(h, 0.0, _COESA_MAX_GEOMETRIC_M)
 
     if h_clipped.ndim == 0:
@@ -162,9 +159,10 @@ def tabulated_density(h):
     ----------
     h : float or array_like
         Altitude above sea level, in metres. Values outside the table
-        range (0 to 86,000 m) are linearly extrapolated; a warning is
-        printed once per call if this happens, since extrapolated
-        density is not physically validated.
+        range (0 to 86,000 m) are linearly extrapolated; extrapolated
+        density is not physically validated, and a model that strays
+        this far from the table (e.g. a diverging integration) is
+        already flagged elsewhere by the caller's own stability checks.
 
     Returns
     -------
@@ -172,9 +170,6 @@ def tabulated_density(h):
         Atmospheric density in kg/m^3.
     """
     h = np.asarray(h, dtype=float)
-    if np.any(h < _TABLE_ALTITUDE_M.min()) or np.any(h > _TABLE_ALTITUDE_M.max()):
-        print(f"Warning: altitude {h} m outside tabulated range "
-              f"[{_TABLE_ALTITUDE_M.min()}, {_TABLE_ALTITUDE_M.max()}] m — extrapolating.")
     return _density_interpolator(h)
 
 

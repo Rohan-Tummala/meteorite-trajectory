@@ -20,6 +20,7 @@ uniform stepping for the same cost.
 """
 
 import time
+import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
@@ -718,10 +719,6 @@ def compute_piecewise_results():
         failed = []
         colors = plt.cm.plasma(np.linspace(0, 0.8, len(pairs)))
 
-        print("\n" + "=" * 80)
-        print(label)
-        print("=" * 80)
-
         for (dt_fine, dt_coarse), color in zip(pairs, colors):
 
             # ------------------------------------------------------
@@ -730,14 +727,22 @@ def compute_piecewise_results():
 
             t0 = time.perf_counter()
 
-            if kind == "fixed":
-                (t_all, y_all, event_y, t_p1, y_p1) = run_piecewise_fixed(
-                    fkey, dt_fine, dt_coarse,
-                )
-            else:
-                (t_all, y_all, event_y, t_p1, y_p1) = run_piecewise_rk45(
-                    dt_fine, dt_coarse,
-                )
+            # The largest coarse steps (particularly for Implicit Euler/
+            # Heun's extra pairs) are expected to produce an unstable or
+            # non-impacting run, which triggers numpy overflow warnings
+            # inside dynamics.py. That outcome is already captured by
+            # this run's own "status" (UNSTABLE/NO IMPACT) below, so the
+            # warnings themselves are suppressed.
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                if kind == "fixed":
+                    (t_all, y_all, event_y, t_p1, y_p1) = run_piecewise_fixed(
+                        fkey, dt_fine, dt_coarse,
+                    )
+                else:
+                    (t_all, y_all, event_y, t_p1, y_p1) = run_piecewise_rk45(
+                        dt_fine, dt_coarse,
+                    )
 
             runtime_s = time.perf_counter() - t0
 
@@ -765,21 +770,6 @@ def compute_piecewise_results():
                 failed.append((dt_fine, dt_coarse))
             else:
                 status = "OK"
-
-            if impact_error is not None:
-                print(
-                    f"{label:>5} fine={dt_fine:<7g} coarse={dt_coarse:<7g} "
-                    f"steps={n_steps:<6d} runtime={runtime_s:8.5f}s "
-                    f"impact error={impact_error:10.3f} m "
-                    f"max height error={max_height_error:10.3f} m [{status}]"
-                )
-            else:
-                print(
-                    f"{label:>5} fine={dt_fine:<7g} coarse={dt_coarse:<7g} "
-                    f"steps={n_steps:<6d} runtime={runtime_s:8.5f}s "
-                    f"impact error={'N/A':>10} "
-                    f"max height error={max_height_error:>10.3g} [{status}]"
-                )
 
             if event_y is not None and sane:
                 lat_i = event_y[3]
@@ -1192,7 +1182,9 @@ def compute_uniform_results():
         print(f"\n{label} (uniform, whole flight):")
         for dt in UNIFORM_STEP_SIZES:
             t0 = time.perf_counter()
-            t_all, y_all, event_y = run_uniform_fixed(fkey, dt)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                t_all, y_all, event_y = run_uniform_fixed(fkey, dt)
             runtime_s = time.perf_counter() - t0
             sane = path_is_sane(y_all)
             n_steps = len(t_all) - 1

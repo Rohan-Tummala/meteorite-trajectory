@@ -25,6 +25,7 @@ Two comparisons are produced:
       legible.
 """
 
+import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
@@ -145,9 +146,17 @@ def figure_A():
     t_truth_fine = np.linspace(0, truth.t[-1], 600)
     h_truth = truth.sol(t_truth_fine)[0] / 1000.0
 
-    rk2 = run_fixed("rk2", dt=5.0)
-    rk4 = run_fixed("rk4", dt=5.0)
-    rk45 = run_rk45_capped(max_step=5.0)
+    # RK2/RK4 at this deliberately coarse step size are expected to
+    # diverge (that is the point of this comparison), which triggers
+    # numpy overflow/invalid-value warnings inside dynamics.py. The
+    # divergence itself is already reported below ("never reached
+    # ground" / "path wanders off physical scale... omitted"), so
+    # these warnings add nothing and are suppressed here.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        rk2 = run_fixed("rk2", dt=5.0)
+        rk4 = run_fixed("rk4", dt=5.0)
+        rk45 = run_rk45_capped(max_step=5.0)
 
     lat_rk2, lon_rk2 = impact_latlon_fixed(rk2)
     lat_rk4, lon_rk4 = impact_latlon_fixed(rk4)
@@ -259,17 +268,24 @@ def figure_B():
         colors = plt.cm.viridis(np.linspace(0, 0.9, len(sweep_values)))
 
         for value, color in zip(sweep_values, colors):
-            if kind == "fixed":
-                res = run_fixed(fkey, dt=value, t_span=FULL_SPAN)
-                t_arr, h_arr = res["t"], res["y"][0] / 1000.0
-                lat_i, lon_i = impact_latlon_fixed(res)
-                path_ok = path_is_sane(res["y"]) if lat_i is not None else False
-            else:  # RK45, sweeping rtol, no max_step cap
-                sol = run_rk45_tol(rtol=value, t_span=FULL_SPAN)
-                t_arr = np.linspace(0, sol.t[-1], 400)
-                h_arr = sol.sol(t_arr)[0] / 1000.0
-                lat_i, lon_i = impact_latlon_solveivp(sol)
-                path_ok = path_is_sane(sol.y) if lat_i is not None else False
+            # The point of this sweep is to find where each method
+            # becomes unstable, so the largest step sizes/tolerances
+            # are expected to overflow inside dynamics.py. That
+            # divergence is already reported below ("... diverged,
+            # omitted"), so the resulting numpy warnings are suppressed.
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                if kind == "fixed":
+                    res = run_fixed(fkey, dt=value, t_span=FULL_SPAN)
+                    t_arr, h_arr = res["t"], res["y"][0] / 1000.0
+                    lat_i, lon_i = impact_latlon_fixed(res)
+                    path_ok = path_is_sane(res["y"]) if lat_i is not None else False
+                else:  # RK45, sweeping rtol, no max_step cap
+                    sol = run_rk45_tol(rtol=value, t_span=FULL_SPAN)
+                    t_arr = np.linspace(0, sol.t[-1], 400)
+                    h_arr = sol.sol(t_arr)[0] / 1000.0
+                    lat_i, lon_i = impact_latlon_solveivp(sol)
+                    path_ok = path_is_sane(sol.y) if lat_i is not None else False
 
             if lat_i is None or not path_ok:
                 diverged.append(value)

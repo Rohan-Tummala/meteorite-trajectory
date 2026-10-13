@@ -22,6 +22,7 @@ the integration method/step size, not from model assumptions.
 """
 
 import time
+import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
@@ -29,7 +30,7 @@ from scipy.integrate import solve_ivp
 from dynamics import meteor_rhs, ground_impact_event, DEFAULT_PARAMS
 from cavezzo import initial_state
 from fixed_step_integrators import integrate_fixed_step
-from plot_trajectory import great_circle_distance
+from plot_trajectory_cavezzo import great_circle_distance
 
 
 def get_impact_lat_lon(y_event):
@@ -100,7 +101,13 @@ def main():
     dt_values = [2.0, 1.0, 0.5, 0.2, 0.1, 0.05, 0.02]
     for method in ["rk2", "rk4"]:
         for dt in dt_values:
-            y_i, rt, nfev = run_fixed_step(y0, t_span, params, method, dt)
+            # The largest step sizes here are expected to diverge, which
+            # triggers numpy overflow warnings inside dynamics.py; the
+            # divergence is already reported below, so these are
+            # suppressed rather than left to spam the console.
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                y_i, rt, nfev = run_fixed_step(y0, t_span, params, method, dt)
             if y_i is None:
                 print(f"{method.upper():>8} dt={dt:>5.2f}s: never reached ground — skipping")
                 continue
