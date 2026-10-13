@@ -13,7 +13,7 @@ from integrator import run_trajectory, impact_state
 from cavezzo import initial_state, RECOVERY_LAT, RECOVERY_LON, \
     RECOVERY_LAT_DEG, RECOVERY_LON_DEG
 from dynamics import DEFAULT_PARAMS
-from plot_trajectory import great_circle_distance
+from plot_trajectory_cavezzo import great_circle_distance
 from wind import _WIND_BEARING_DEG
 
 
