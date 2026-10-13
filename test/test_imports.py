@@ -30,7 +30,7 @@ MODULES = [
     "numerical_methods_comparison",
     "plot_numerical_comparison",
     "plot_piecewise_stepping",
-    "plot_trajectory",
+    "plot_trajectory_cavezzo",
     "plot_trajectory_bunburra",
     "plot_wind_comparison",
     "run_all",
