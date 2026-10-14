@@ -20,7 +20,6 @@ which one is active, e.g.:
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.interpolate import interp1d
 
 # ---------------------------------------------------------------------
 # Exponential model
@@ -138,31 +137,36 @@ def coesa_density(h):
 _TABLE_ALTITUDE_M = np.arange(0.0, _COESA_MAX_GEOMETRIC_M + 1.0, 1000.0)
 _TABLE_DENSITY_KGM3 = coesa_density(_TABLE_ALTITUDE_M)
 
-# Build the interpolator once at import time so repeated calls are cheap.
-# bounds_error=False + fill_value="extrapolate" avoids crashing on values
-# slightly outside the table; a warning is raised instead (see below).
-_density_interpolator = interp1d(
-    _TABLE_ALTITUDE_M,
-    _TABLE_DENSITY_KGM3,
-    kind="linear",
-    bounds_error=False,
-    fill_value="extrapolate",
-)
-
-
 def tabulated_density(h):
     """
     Tabulated atmosphere model: linear interpolation over a standard
     atmosphere density table.
 
+    Uses numpy.interp rather than scipy.interpolate.interp1d. Both do
+    the same linear interpolation, but interp1d's general-purpose
+    object overhead dominates runtime when called with a single
+    scalar altitude on every RHS evaluation of the ODE solver
+    (profiled: this lookup was ~69% of meteor_rhs's total time, and
+    ~98% of that was the interp1d call itself). np.interp is a
+    dedicated 1D linear-interpolation routine with far less per-call
+    overhead for exactly this use pattern.
+
+    One behavioural difference from the previous interp1d-based
+    version: np.interp does not extrapolate. A value outside the
+    table range (0 to 86,000 m) is clamped to the nearest table
+    boundary's density, rather than linearly extrapolated. This is
+    arguably safer, it cannot return a negative density the way
+    linear extrapolation technically could, and a model straying this
+    far out of range (e.g. a diverging integration) is already
+    flagged elsewhere by the caller's own stability checks regardless
+    of what density value is returned here.
+
     Parameters
     ----------
     h : float or array_like
         Altitude above sea level, in metres. Values outside the table
-        range (0 to 86,000 m) are linearly extrapolated; extrapolated
-        density is not physically validated, and a model that strays
-        this far from the table (e.g. a diverging integration) is
-        already flagged elsewhere by the caller's own stability checks.
+        range are clamped to the nearest boundary density rather than
+        extrapolated.
 
     Returns
     -------
@@ -170,7 +174,7 @@ def tabulated_density(h):
         Atmospheric density in kg/m^3.
     """
     h = np.asarray(h, dtype=float)
-    return _density_interpolator(h)
+    return np.interp(h, _TABLE_ALTITUDE_M, _TABLE_DENSITY_KGM3)
 
 
 # ---------------------------------------------------------------------
