@@ -34,6 +34,7 @@ from plot_trajectory_cavezzo import great_circle_distance
 
 
 def get_impact_lat_lon(y_event):
+    """Pull latitude and longitude (rad) out of a state vector at impact."""
     return y_event[3], y_event[4]  # phi, lambda (rad)
 
 
@@ -54,6 +55,8 @@ def run_truth_solver(y0, t_span, params):
 
 
 def run_adaptive(y0, t_span, params, method, rtol=1e-8, atol=1e-10):
+    """Run one adaptive solve_ivp method (e.g. RK45, DOP853) at a normal
+    tolerance and return the impact state, runtime, and function-eval count."""
     ground_impact_event.terminal = True
     ground_impact_event.direction = -1
     t0 = time.perf_counter()
@@ -69,12 +72,18 @@ def run_adaptive(y0, t_span, params, method, rtol=1e-8, atol=1e-10):
 
 
 def run_fixed_step(y0, t_span, params, method, dt):
+    """Run one hand-written fixed-step method (rk2 or rk4) at a given step
+    size and return the impact state, runtime, and function-eval count."""
     f = lambda t, y: meteor_rhs(t, y, params=params)
     result = integrate_fixed_step(f, y0, t_span[0], t_span[1], dt, method=method)
     return result["event_y"], result["runtime_s"], result["n_evals"]
 
 
 def main():
+    """Run the full comparison: a truth reference, the adaptive methods at
+    normal tolerance, and RK2/RK4 across a range of step sizes, printing
+    each run's error against truth, runtime, and function-eval count.
+    Returns the collected results as a list of dicts for plot_results()."""
     y0 = initial_state()
     t_span = (0.0, 600.0)
     params = DEFAULT_PARAMS  # identical physics for every run — isolates numerical error
@@ -122,6 +131,9 @@ def main():
 
 
 def plot_results(results):
+    """Plot the results from main(): left panel is RK2/RK4 convergence
+    (error vs. step size), right panel is accuracy vs. computational cost
+    for every method tested (adaptive and fixed-step alike)."""
     fig, axes = plt.subplots(1, 2, figsize=(13, 5.5))
 
     # --- Panel 1: convergence (error vs step size) for RK2/RK4 ---

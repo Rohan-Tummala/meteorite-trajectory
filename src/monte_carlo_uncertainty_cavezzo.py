@@ -332,6 +332,10 @@ def plot_probability_contour(result, grid_res=200):
 
 
 def main():
+    """Entry point: reuse cached Monte Carlo results if present (asks
+    before re-running, since N_SAMPLES runs are expensive), otherwise
+    run the simulation, cache it, and plot the impact probability
+    contour for the Cavezzo fall."""
     if os.path.exists(CACHE_FILE):
         answer = input(f"Cached Monte Carlo results found ({CACHE_FILE}). "
                         f"Re-run simulation? [y/N]: ").strip().lower()

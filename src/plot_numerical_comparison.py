@@ -104,6 +104,8 @@ def run_rk45_capped(max_step, t_span=FULL_SPAN, rtol=1e-8):
 
 
 def run_fixed(method, dt, t_span=FULL_SPAN):
+    """Run a hand-written fixed-step method (rk2 or rk4) at the given step
+    size and return the raw integrate_fixed_step() result dict."""
     f = lambda t, y: meteor_rhs(t, y, params=params)
     return integrate_fixed_step(f, initial_state(), t_span[0], t_span[1], dt, method=method)
 
@@ -122,12 +124,16 @@ def path_is_sane(y_array, lat_idx=3, lon_idx=4, bound_deg=90):
 
 
 def impact_latlon_fixed(result):
+    """Pull impact latitude/longitude (rad) from a run_fixed() result,
+    or (None, None) if the run never reached the ground."""
     if result["event_y"] is None:
         return None, None
     return result["event_y"][3], result["event_y"][4]
 
 
 def impact_latlon_solveivp(sol):
+    """Pull impact latitude/longitude (rad) from a solve_ivp solution,
+    or (None, None) if the ground-impact event never fired."""
     if len(sol.t_events[0]) == 0:
         return None, None
     y = sol.y_events[0][0]
@@ -139,6 +145,9 @@ def impact_latlon_solveivp(sol):
 # ---------------------------------------------------------------------
 
 def figure_A():
+    """Build Figure A: truth solution vs. RK2/RK4/RK45 at one deliberately
+    coarse step size (5s), showing the full-trajectory altitude profile
+    and the ground track/impact points side by side."""
     print("=== Figure A: truth vs. RK2/RK4/RK45 at step size 5 ===")
 
     truth = run_truth()
@@ -239,6 +248,9 @@ def figure_A():
 # ---------------------------------------------------------------------
 
 def figure_B():
+    """Build Figure B: a 2x3 grid sweeping RK2, RK4 (step size) and RK45
+    (rtol) against the truth solution, with altitude convergence on top
+    and the resulting impact-location spread on the bottom row."""
     print("\n=== Figure B: per-method step-size convergence grid ===")
 
     truth_full = run_truth(t_span=FULL_SPAN)
