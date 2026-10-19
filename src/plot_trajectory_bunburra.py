@@ -36,6 +36,9 @@ def great_circle_distance(lat1, lon1, lat2, lon2, R=6371000.0):
 
 
 def plot_full_trajectory():
+    """Integrate the Bunburra Rockhole fall with RK45 and plot the full
+    trajectory (altitude, speed, ground track) against the real recovery
+    location, reporting the impact-point offset."""
     y0 = initial_state()
     t_span = (0.0, 600.0)
     params = {**DEFAULT_PARAMS, "rho_m": RHO_M}

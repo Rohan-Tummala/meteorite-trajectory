@@ -18,6 +18,9 @@ from plot_trajectory_cavezzo import great_circle_distance
 
 
 def plot_wind_comparison():
+    """Run the Cavezzo fall with and without the wind-drift correction and
+    plot how much the predicted impact point shifts, to show the effect
+    of modelling wind versus ignoring it."""
     y0 = initial_state()
     t_span = (0.0, 600.0)
 

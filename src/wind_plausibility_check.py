@@ -26,6 +26,10 @@ def bearing_deg(lat1, lon1, lat2, lon2):
 
 
 def main():
+    """Sanity-check the wind-drift correction: compare the no-wind and
+    with-wind impact points against the real recovery site, and back out
+    what average wind speed/bearing would be needed to close the no-wind
+    gap, to check it's physically plausible rather than an arbitrary fudge."""
     y0 = initial_state()
 
     # No-wind nominal run.
