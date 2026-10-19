@@ -137,6 +137,7 @@ def coesa_density(h):
 _TABLE_ALTITUDE_M = np.arange(0.0, _COESA_MAX_GEOMETRIC_M + 1.0, 1000.0)
 _TABLE_DENSITY_KGM3 = coesa_density(_TABLE_ALTITUDE_M)
 
+
 def tabulated_density(h):
     """
     Tabulated atmosphere model: linear interpolation over a standard
