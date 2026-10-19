@@ -9,7 +9,7 @@ Two families compared:
     - Fixed-step RK2 (Heun) and RK4 (classical), at several step
       sizes, implemented by hand in fixed_step_integrators.py since
       scipy.solve_ivp only offers adaptive methods.
-    - Adaptive RK23, RK45, DOP853 via scipy.solve_ivp, at a normal
+    - Adaptive RK45, DOP853 via scipy.solve_ivp, at a normal
       (not ultra-tight) tolerance.
 
 All are compared against a "truth" reference: DOP853 at very tight
