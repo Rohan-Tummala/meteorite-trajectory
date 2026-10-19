@@ -88,7 +88,7 @@ def main():
     results = []  # list of dicts: method, dt/tol label, error_m, runtime_s, n_evals
 
     # --- Adaptive methods at normal tolerance ---
-    for method in ["RK23", "RK45", "DOP853"]:
+    for method in ["RK45", "DOP853"]:
         y_i, rt, nfev = run_adaptive(y0, t_span, params, method)
         lat_i, lon_i = get_impact_lat_lon(y_i)
         err = great_circle_distance(lat_i, lon_i, lat_truth, lon_truth)
