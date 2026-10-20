@@ -147,8 +147,8 @@ def tabulated_density(h):
     the same linear interpolation, but interp1d's general-purpose
     object overhead dominates runtime when called with a single
     scalar altitude on every RHS evaluation of the ODE solver
-    (profiled: this lookup was ~69% of meteor_rhs's total time, and
-    ~98% of that was the interp1d call itself). np.interp is a
+    (profiled, see Table 2 in the project report for the measured
+    before/after split). np.interp is a
     dedicated 1D linear-interpolation routine with far less per-call
     overhead for exactly this use pattern.
 
