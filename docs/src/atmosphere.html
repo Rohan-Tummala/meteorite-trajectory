@@ -240,8 +240,8 @@ rho = density(h, model="table")   # or model="exp"
 </span><span id="L-147"><a href="#L-147"><span class="linenos">147</span></a><span class="sd">    the same linear interpolation, but interp1d's general-purpose</span>
 </span><span id="L-148"><a href="#L-148"><span class="linenos">148</span></a><span class="sd">    object overhead dominates runtime when called with a single</span>
 </span><span id="L-149"><a href="#L-149"><span class="linenos">149</span></a><span class="sd">    scalar altitude on every RHS evaluation of the ODE solver</span>
-</span><span id="L-150"><a href="#L-150"><span class="linenos">150</span></a><span class="sd">    (profiled: this lookup was ~69% of meteor_rhs's total time, and</span>
-</span><span id="L-151"><a href="#L-151"><span class="linenos">151</span></a><span class="sd">    ~98% of that was the interp1d call itself). np.interp is a</span>
+</span><span id="L-150"><a href="#L-150"><span class="linenos">150</span></a><span class="sd">    (profiled, see Table 2 in the project report for the measured</span>
+</span><span id="L-151"><a href="#L-151"><span class="linenos">151</span></a><span class="sd">    before/after split). np.interp is a</span>
 </span><span id="L-152"><a href="#L-152"><span class="linenos">152</span></a><span class="sd">    dedicated 1D linear-interpolation routine with far less per-call</span>
 </span><span id="L-153"><a href="#L-153"><span class="linenos">153</span></a><span class="sd">    overhead for exactly this use pattern.</span>
 </span><span id="L-154"><a href="#L-154"><span class="linenos">154</span></a>
@@ -512,8 +512,8 @@ defining piecewise equations (not interpolated from a table).</p>
 </span><span id="tabulated_density-148"><a href="#tabulated_density-148"><span class="linenos">148</span></a><span class="sd">    the same linear interpolation, but interp1d's general-purpose</span>
 </span><span id="tabulated_density-149"><a href="#tabulated_density-149"><span class="linenos">149</span></a><span class="sd">    object overhead dominates runtime when called with a single</span>
 </span><span id="tabulated_density-150"><a href="#tabulated_density-150"><span class="linenos">150</span></a><span class="sd">    scalar altitude on every RHS evaluation of the ODE solver</span>
-</span><span id="tabulated_density-151"><a href="#tabulated_density-151"><span class="linenos">151</span></a><span class="sd">    (profiled: this lookup was ~69% of meteor_rhs's total time, and</span>
-</span><span id="tabulated_density-152"><a href="#tabulated_density-152"><span class="linenos">152</span></a><span class="sd">    ~98% of that was the interp1d call itself). np.interp is a</span>
+</span><span id="tabulated_density-151"><a href="#tabulated_density-151"><span class="linenos">151</span></a><span class="sd">    (profiled, see Table 2 in the project report for the measured</span>
+</span><span id="tabulated_density-152"><a href="#tabulated_density-152"><span class="linenos">152</span></a><span class="sd">    before/after split). np.interp is a</span>
 </span><span id="tabulated_density-153"><a href="#tabulated_density-153"><span class="linenos">153</span></a><span class="sd">    dedicated 1D linear-interpolation routine with far less per-call</span>
 </span><span id="tabulated_density-154"><a href="#tabulated_density-154"><span class="linenos">154</span></a><span class="sd">    overhead for exactly this use pattern.</span>
 </span><span id="tabulated_density-155"><a href="#tabulated_density-155"><span class="linenos">155</span></a>
@@ -551,8 +551,8 @@ atmosphere density table.</p>
 the same linear interpolation, but interp1d's general-purpose
 object overhead dominates runtime when called with a single
 scalar altitude on every RHS evaluation of the ODE solver
-(profiled: this lookup was ~69% of meteor_rhs's total time, and
-~98% of that was the interp1d call itself). np.interp is a
+(profiled, see Table 2 in the project report for the measured
+before/after split). np.interp is a
 dedicated 1D linear-interpolation routine with far less per-call
 overhead for exactly this use pattern.</p>
 
