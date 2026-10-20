@@ -8,10 +8,11 @@ The integration method and tolerances are parameters, not hardcoded,
 so the SAME physics (meteor_rhs, with a fixed params dict) can be run
 through different numerical methods for comparison:
 
-    - Fixed-step-like methods: "RK23" (2nd/3rd order), "RK45" (default,
+    - Adaptive methods: "RK23" (2nd/3rd order), "RK45" (default,
       4th/5th order Dormand-Prince), "DOP853" (8th order) — all
-      adaptive in scipy, but rtol/atol can be tightened to approximate
-      a "truth" reference solution, or loosened for a cheaper run.
+      variable-step in scipy, but rtol/atol can be tightened to
+      approximate a "truth" reference solution, or loosened for a
+      cheaper run.
     - Implicit methods "Radau", "BDF", "LSODA" are also available via
       scipy if needed for stiffness comparisons.
 
