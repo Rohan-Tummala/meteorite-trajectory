@@ -2,3 +2,6 @@ numpy
 scipy
 matplotlib
 pytest
+pdoc
+line_profiler
+scalene

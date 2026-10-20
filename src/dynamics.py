@@ -11,7 +11,8 @@ State vector (7 elements):
 
     h      altitude, m
     V      speed, m/s
-    gamma  flight-path angle, rad (below horizontal, positive = descending)
+    gamma  flight-path angle, rad (below horizontal, negative = descending,
+           e.g. gamma = -68 deg for a steep descent)
     phi    latitude, rad
     lambda longitude, rad
     psi    heading/azimuth, rad
@@ -38,8 +39,8 @@ R_E = 6371000.0  # mean Earth radius, m (kept consistent with gravity.py)
 # ---------------------------------------------------------------------
 # These are NOT measured quantities — they are model assumptions/
 # coefficients that must be sourced and justified separately. Defaults
-# below are placeholders; replace with values justified for the
-# chosen meteor event (e.g. Cavezzo).
+# below are sourced from the published literature (see the per-parameter
+# citations below), not freely chosen.
 
 DEFAULT_PARAMS = {
     "Cd": 0.92,        # drag coefficient, dimensionless — standard

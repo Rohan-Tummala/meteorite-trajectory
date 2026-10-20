@@ -228,7 +228,7 @@ def plot_atmosphere_comparison(interp_kind="linear"):
     interp_kind : str, optional
         Interpolation method label shown in the legend. Currently the
         underlying interpolator is fixed to "linear" (see
-        `_density_interpolator`); this parameter only affects the
+        `tabulated_density`); this parameter only affects the
         legend text until cubic interpolation is added. Default "linear".
     """
     h_fine = np.linspace(0, _TABLE_ALTITUDE_M.max(), 500)
