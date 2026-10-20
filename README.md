@@ -25,8 +25,10 @@ and quantify how confident that prediction can be.**
 - **Scope and limitations**: the model is a 3D point-mass approximation
   (frozen heading, no fragmentation), uses a shared drag/ablation
   coefficient pair across both case studies rather than one tuned per
-  meteorite, and its dark-flight wind model is a simplified profile fitted
-  to each paper's reported wind data, not a full atmospheric reanalysis.
+  meteorite. Only Cavezzo has a dark-flight wind model, a simplified
+  profile fitted to the wind data Gardiol et al. (2021) report for that
+  fall, not a full atmospheric reanalysis; Bunburra has no reported wind
+  data to fit a profile to, so it is run without one.
   These choices and their consequences are discussed under Testing, below.
 
 The same core physics is run two ways:
@@ -55,7 +57,7 @@ solution elsewhere in the project moves the predicted impact point by only
 about 2e-5 m, i.e. its own numerical error is negligible at the tolerance
 actually used.
 
-Four alternative integration approaches are compared against that
+Three alternative integration approaches are compared against that
 reference in `numerical_methods_comparison.py` and
 `plot_numerical_comparison.py`: the hand-written fixed-step RK2 and RK4
 methods, and scipy's adaptive RK45. Each is run across a range of step
@@ -105,9 +107,16 @@ variables (altitude, speed, flight-path angle, latitude, longitude,
 heading, mass) as independent normals centred on the paper's reported
 value with its stated 1-sigma uncertainty, plus the ablation coefficient
 `sigma_abl` as a uniform draw over the range Ceplecha et al. (1998, Table
-VII) fit to the Lost City fall. The drag coefficient `Cd` is held fixed,
-since its uncertainty at these entry speeds is negligible next to the
-other inputs. Each sample is propagated through the full model to ground
+VII) fit to the Lost City fall. The drag coefficient `Cd` is held fixed
+instead of sampled, because unlike `sigma_abl` it has no published,
+fall-specific uncertainty range to draw from; `sensitivity_sweep.py`
+checks it anyway with a generic +/-10% engineering bound rather than a
+sourced uncertainty, and that sweep actually shows `Cd`'s effect on the
+impact point is larger than `sigma_abl`'s for both falls, so leaving it
+out of the Monte Carlo is a real limitation, not a negligible-effect
+assumption (see Testing, below).
+
+Each sample is propagated through the full model to ground
 impact, giving a scatter of impact coordinates. A Gaussian KDE is fitted
 to that scatter and evaluated over a 200x200 grid covering the footprint,
 turning the raw points into a smooth density surface.
