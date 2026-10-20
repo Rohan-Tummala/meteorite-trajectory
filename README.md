@@ -23,17 +23,18 @@ and quantify how confident that prediction can be.**
   probability map of likely landing coordinates, built by propagating the
   input uncertainties through the full nonlinear model.
 - **Scope and limitations**: the model is a 3D point-mass approximation
-  (no rotation, no fragmentation), uses a shared drag/ablation coefficient
-  pair across both case studies rather than one tuned per meteorite, and
-  its dark-flight wind model is a simplified profile fitted to each paper's
-  reported wind data, not a full atmospheric reanalysis. These choices and
-  their consequences are discussed under Testing, below.
+  (frozen heading, no fragmentation), uses a shared drag/ablation
+  coefficient pair across both case studies rather than one tuned per
+  meteorite, and its dark-flight wind model is a simplified profile fitted
+  to each paper's reported wind data, not a full atmospheric reanalysis.
+  These choices and their consequences are discussed under Testing, below.
 
 The same core physics is run two ways:
 
 - **Deterministic trajectory validation**: comparing the simulated
   terminal point (end of the luminous trail) against each paper's reported
-  values for altitude, velocity and ground track.
+  values for altitude, velocity and mass (`terminal_point_check.py`), and
+  against digitized published height-vs-time curves where available.
 - **Monte Carlo uncertainty propagation**: sampling the stated
   measurement uncertainties on entry conditions, propagating them through
   the full nonlinear model, and building a kernel-density probability map
@@ -44,22 +45,28 @@ The same core physics is run two ways:
 The full meteoroid trajectory system (`dynamics.py`) is a coupled nonlinear
 ODE system with no closed-form solution, so there is no exact analytical
 result to compare against directly. That's only possible for the simple
-decay-equation test case used in `test/test_integrator.py` to validate
-basic solver accuracy. Instead, a tight-tolerance DOP853 run (`rtol=1e-12`,
-very small `max_step`) is used as a high-accuracy reference ("truth")
-solution. At that tolerance its numerical error is far smaller than any of
-the candidate methods being compared, so it stands in for ground truth when
-assessing them.
+decay-equation test case used in `test/test_integrator.py` and
+`test/test_convergence_order.py` to validate basic solver accuracy and
+fitted convergence order. Instead, a tight-tolerance DOP853 run
+(`rtol=1e-12`, very small `max_step`) is used as a high-accuracy reference
+("truth") solution. `roundoff_test.py` confirms that tightening the
+tolerance further than the `rtol=1e-10` actually used for the reference
+solution elsewhere in the project moves the predicted impact point by only
+about 2e-5 m, i.e. its own numerical error is negligible at the tolerance
+actually used.
 
 Four alternative integration approaches are compared against that
 reference in `numerical_methods_comparison.py` and
 `plot_numerical_comparison.py`: the hand-written fixed-step RK2 and RK4
 methods, and scipy's adaptive RK45. Each is run across a range of step
-sizes (or `max_step` for RK45) and judged on accuracy (impact-location and
+sizes (or tolerance for RK45) and judged on accuracy (impact-location and
 altitude-profile error against the reference) versus computational cost
-(runtime), rather than on accuracy alone. A method that is only marginally
-more accurate but far slower is not necessarily the better choice for this
-problem.
+(runtime), rather than on accuracy alone, which is why RK45 is the method
+carried forward for the production trajectory and Monte Carlo runs.
+`convergence_order_check.py` separately fits the global convergence order
+of RK2 and RK4 by step-halving against the known exact solution of a
+decay ODE (order ≈2.03 and ≈4.03, matching theory), backed by
+`test/test_convergence_order.py`.
 
 `plot_piecewise_stepping.py` then takes the best-performing methods from
 that comparison and tests one specific optimisation: splitting the
@@ -69,6 +76,11 @@ instead of a single uniform fine step across the whole trajectory. This is
 compared against the uniform-step baseline on the same accuracy-vs-runtime
 basis, to check whether the piecewise approach actually saves computation
 for the same accuracy or whether it costs accuracy to do so.
+
+`profile_compare.py` profiles the atmosphere density lookup directly,
+comparing the original `scipy.interpolate.interp1d`-based implementation
+(`atmosphere_OLD_interp1d.py`) against the current `numpy.interp`-based
+one, confirming the replacement is both faster and numerically identical.
 
 Separately, comparing the deterministic trajectory output against each
 paper's reported terminal-point values (see Testing, below) separates
@@ -80,8 +92,11 @@ higher-order coupling effect present in a real meteor fall, things like
 fragmentation, rotation-dependent drag, ablation-drag feedback through a
 changing shape and area, or a fully resolved wind field. So some residual
 mismatch against the real recovered coordinates is expected even with
-near-exact numerics. The xfail tests in `test/test_monte_carlo.py` document
-this directly rather than hiding it.
+near-exact numerics. `sensitivity_sweep.py` checks how much of that
+mismatch could plausibly come from the shared, un-fitted drag/ablation
+coefficients (small, for both falls) rather than from missing physics.
+The xfail tests in `test/test_monte_carlo.py` document the remaining gap
+directly rather than hiding it.
 
 ## Monte Carlo uncertainty propagation
 
@@ -95,12 +110,22 @@ since its uncertainty at these entry speeds is negligible next to the
 other inputs. Each sample is propagated through the full model to ground
 impact, giving a scatter of impact coordinates. A Gaussian KDE is fitted
 to that scatter and evaluated over a 200x200 grid covering the footprint,
-turning the raw points into a smooth density surface. The density at
-every sample point is then sorted and cumulatively summed to find the
-threshold that encloses each target probability mass (the HPD levels),
-and the map is drawn by filling the region between those thresholds, so
-each shaded band is an actual region of highest density rather than a
-fixed percentile of the grid.
+turning the raw points into a smooth density surface.
+
+The HPD (highest-posterior-density) threshold for a given probability mass
+is found by sorting the density evaluated at every *sample*, then picking
+the threshold such that that fraction of samples (by count) lies at or
+above it. Since the Monte Carlo samples are already drawn proportional to
+the distribution being estimated, the fraction of samples above a density
+threshold is itself a direct empirical estimate of the enclosed
+probability mass. An earlier version of this function instead summed the
+density *values* themselves rather than counting samples, which
+over-weights the highest-density points: its nominal 39.3/86.5/98.9
+percent contours actually enclosed only about 22/63/90 percent of samples,
+checked against a known 2D Gaussian where the true answer is known exactly
+(`test/test_monte_carlo.py::test_hpd_levels_matches_known_gaussian_coverage`).
+The corrected version is checked against the same Gaussian and recovers
+exact coverage.
 
 The contour bands reported as "1-sigma/2-sigma/3-sigma" are the 2D
 highest-posterior-density equivalents of those probabilities (39.3%,
@@ -128,18 +153,26 @@ meteorite-trajectory/
 ├── src/
 │   ├── dynamics.py                        # equations of motion (RHS for the ODE solver)
 │   ├── atmosphere.py                      # atmospheric density models
+│   ├── atmosphere_OLD_interp1d.py         # prior interp1d-based density model, kept for profile_compare.py
 │   ├── gravity.py                         # altitude-dependent gravity
 │   ├── wind.py                            # simplified dark-flight wind-drift model
+│   ├── wind_plausibility_check.py         # wind-bearing back-calculation against published values
 │   ├── integrator.py                      # adaptive (scipy) integration wrapper + impact event
 │   ├── fixed_step_integrators.py          # hand-written RK2, RK4, implicit Euler, implicit Heun
 │   ├── bunburra.py / cavezzo.py           # per-fall initial conditions, sourced from each paper
 │   ├── data/                              # digitized reference points and cached Monte Carlo results
 │   ├── plot_trajectory_bunburra.py        # Bunburra deterministic trajectory validation plot
-│   ├── plot_trajectory_cavezzo.py         # Cavezzo deterministic trajectory validation plot
+│   ├── plot_trajectory_cavezzo.py         # Cavezzo deterministic trajectory validation plot + height RMSE
+│   ├── terminal_point_check.py            # model vs. published terminal-point state, both falls
 │   ├── numerical_methods_comparison.py    # accuracy/cost comparison across integrators
 │   ├── plot_numerical_comparison.py       # plots for the above comparison
 │   ├── plot_piecewise_stepping.py         # phase-aware vs. uniform stepping, stability analysis
 │   ├── plot_wind_comparison.py            # effect of wind drift on landing position
+│   ├── roundoff_test.py                   # DOP853 tolerance convergence check (truth-solver validation)
+│   ├── convergence_order_check.py         # fits global convergence order of RK2/RK4 by step-halving
+│   ├── sensitivity_sweep.py               # one-at-a-time Cd/sigma_abl sweep, both falls
+│   ├── profile_compare.py                 # interp1d vs. np.interp atmosphere-lookup profiling
+│   ├── profiler.py / profile_memory.py    # cProfile / Scalene profiling helpers
 │   ├── monte_carlo_uncertainty_*.py       # Monte Carlo sampling + probability-contour maps
 │   └── run_all.py                         # runs all deliverable scripts in sequence
 ├── test/                                  # pytest test suite (see Testing, below)
@@ -160,7 +193,8 @@ pdoc -o docs src
 ## Requirements
 
 - Python 3.9+
-- `numpy`, `scipy`, `matplotlib` (see `requirements.txt`)
+- `numpy`, `scipy`, `matplotlib`, `pytest`, `pdoc`, `line_profiler`,
+  `scalene` (see `requirements.txt` for exact pinned versions)
 
 ```bash
 pip install -r requirements.txt
@@ -182,9 +216,13 @@ Individual scripts can also be run on their own, e.g.:
 
 ```bash
 cd src
-python plot_trajectory_cavezzo.py          # Cavezzo trajectory validation
+python plot_trajectory_cavezzo.py          # Cavezzo trajectory validation + height RMSE
 python plot_trajectory_bunburra.py         # Bunburra trajectory validation
+python terminal_point_check.py             # model vs. published terminal-point state, both falls
 python monte_carlo_uncertainty_cavezzo.py  # Cavezzo probability map
+python sensitivity_sweep.py                # Cd/sigma_abl sensitivity, both falls
+python roundoff_test.py                    # DOP853 tolerance convergence check
+python convergence_order_check.py          # fitted RK2/RK4 convergence order
 ```
 
 The Monte Carlo scripts cache their sampled results (`mc_cache_*.npz`) so
@@ -202,11 +240,14 @@ pytest
 It covers four areas, matching this project's validation requirements:
 
 - **Known-value and ground-truth checks**: e.g. gravity at known
-  altitudes, coordinate-conversion helpers against hand-computed examples.
+  altitudes, coordinate-conversion helpers against hand-computed examples,
+  and the Monte Carlo HPD-threshold logic against a known 2D Gaussian
+  distribution (`test_hpd_levels_matches_known_gaussian_coverage`).
 - **Comparison against an established computational method**: the
   hand-written fixed-step integrators (RK2, RK4, implicit Euler, implicit
   Heun) are checked against the closed-form exact solution of a known test
-  ODE, and ranked by accuracy order.
+  ODE, ranked by accuracy order, and their global convergence order is
+  fitted directly and checked against theory (`test_convergence_order.py`).
 - **Sensitivity and stability testing**: a stiff-ODE case confirming the
   implicit methods remain bounded where the explicit method diverges.
 - **Physical constraints and real-world validation**: ablation only
@@ -222,15 +263,21 @@ isolates physical-model calibration error from numerical error, which is
 one of this project's explicit goals (see the reasoning in
 `test/test_monte_carlo.py` and `src/plot_numerical_comparison.py`).
 
-Expected result: **85 passed, 2 xfailed**.
+Expected result: **89 passed, 2 xfailed** (91 tests total).
 
 ## References
 
-- Spurný, P., et al. (2012). *Atmospheric trajectory and heliocentric orbit
-  of the Bunburra Rockhole meteorite fall.*
-- Gardiol, D., et al. (2021). *The Cavezzo meteorite fall.* Wind speed and
-  direction used in `wind.py` are taken directly from this paper's Section
-  3.4 and Fig. 5.
+- Spurný, P., Bland, P. A., Shrbený, L., Borovička, J., Ceplecha, Z., et
+  al. (2012). *The Bunburra Rockhole meteorite fall in SW Australia:
+  fireball trajectory, luminosity, dynamics, orbit, and impact position
+  from photographic and photoelectric records.* Meteoritics & Planetary
+  Science, 47(2), 163-185. https://doi.org/10.1111/j.1945-5100.2011.01321.x
+- Gardiol, D., Barghini, D., Buzzoni, A., et al. (2021). *Cavezzo, the
+  first Italian meteorite recovered by the PRISMA fireball network. Orbit,
+  trajectory, and strewn-field.* Monthly Notices of the Royal Astronomical
+  Society, 501(1), 1215-1227. https://doi.org/10.1093/mnras/staa3646. Wind
+  speed and direction used in `wind.py` are taken directly from this
+  paper's Section 3.4 and Fig. 5.
 - Ceplecha, Z., Borovička, J., Elford, W. G., ReVelle, D. O., Hawkes, R. L.,
   Porubčan, V., & Šimek, M. (1998). *Meteor phenomena and bodies.* Space
   Science Reviews, 84(3-4), 327-471. Source of the drag/ablation equations

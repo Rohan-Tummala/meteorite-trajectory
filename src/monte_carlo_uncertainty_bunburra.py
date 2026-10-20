@@ -177,12 +177,28 @@ def hpd_levels(density_values, mass_fractions=(0.393, 0.865, 0.989)):
     (HPD) probability masses, for contour levels on a KDE surface.
 
     Same logic as the Cavezzo run's hpd_levels(): sorts the density
-    evaluated at every sample point, then finds the thresholds that
-    enclose each requested cumulative probability mass -- NOT the
-    naive 1D 68.3/95.4/99.7% percentile bands. Default mass fractions
-    are the true 2D Gaussian-equivalent 1-sigma/2-sigma/3-sigma
-    enclosed probabilities, matching the convention Gardiol et al.
-    (2021) use for their published Cavezzo strewn-field ellipse.
+    evaluated at every sample point, then finds the threshold such
+    that the given FRACTION OF SAMPLES (by count, not by summed
+    density) lies at or above it -- NOT the naive 1D 68.3/95.4/99.7%
+    percentile bands. Because the Monte Carlo samples are already
+    drawn proportional to the underlying distribution, the fraction
+    of samples above a density threshold is itself a direct empirical
+    estimate of the probability mass enclosed by that threshold's
+    contour. Default mass fractions are the true 2D Gaussian-
+    equivalent 1-sigma/2-sigma/3-sigma enclosed probabilities,
+    matching the convention Gardiol et al. (2021) use for their
+    published Cavezzo strewn-field ellipse.
+
+    An earlier version of this function summed the density VALUES
+    themselves (cumsum over sorted density, normalized) instead of
+    counting samples. That over-weights the highest-density points,
+    so the cumulative sum reaches a given fraction after far fewer
+    samples than it should, pushing every threshold too high and
+    every contour too narrow. Checked against a known 2D standard
+    Gaussian: the old version's nominal 39.3/86.5/98.9 percent
+    contours actually enclosed about 22/63/90 percent of samples.
+    This version was checked against the same Gaussian and recovers
+    the correct coverage (see test_monte_carlo.py).
 
     Parameters
     ----------
@@ -199,12 +215,11 @@ def hpd_levels(density_values, mass_fractions=(0.393, 0.865, 0.989)):
         same order as mass_fractions.
     """
     sorted_density = np.sort(density_values)[::-1]
-    cumulative = np.cumsum(sorted_density)
-    cumulative /= cumulative[-1]
+    n = len(sorted_density)
     thresholds = []
     for frac in mass_fractions:
-        idx = np.searchsorted(cumulative, frac)
-        idx = min(idx, len(sorted_density) - 1)
+        idx = int(round(frac * n)) - 1
+        idx = min(max(idx, 0), n - 1)
         thresholds.append(sorted_density[idx])
     return thresholds
 

@@ -43,18 +43,46 @@ SRC_DIR = os.path.dirname(os.path.abspath(mc_bunburra.__file__))
 @pytest.mark.parametrize("hpd_levels", [mc_bunburra.hpd_levels, mc_cavezzo.hpd_levels])
 def test_hpd_levels_hand_computed_example(hpd_levels):
     """
-    For density_values = [1, 2, ..., 10]: sorted descending gives
-    [10, 9, ..., 1], cumulative sum [10, 19, 27, 34, 40, 45, 49, 52,
-    54, 55], normalized to [0.182, 0.345, 0.491, 0.618, 0.727, 0.818,
-    0.891, 0.945, 0.982, 1.0].
-
-    For mass_fraction = 0.393, the cumulative mass crosses 0.393
-    between index 1 (0.345) and index 2 (0.491), so the threshold
-    should land on sorted_density[2] = 8.
+    For density_values = [1, 2, ..., 10] (n=10), sorted descending
+    gives [10, 9, ..., 1]. For mass_fraction = 0.393, the target
+    sample count is round(0.393 * 10) = 4, so the threshold is the
+    4th-highest value: sorted_density[3] = 7.
     """
     density_values = np.arange(1, 11, dtype=float)
     thresholds = hpd_levels(density_values, mass_fractions=(0.393,))
-    assert thresholds[0] == pytest.approx(8.0)
+    assert thresholds[0] == pytest.approx(7.0)
+
+
+@pytest.mark.parametrize("hpd_levels", [mc_bunburra.hpd_levels, mc_cavezzo.hpd_levels])
+def test_hpd_levels_matches_known_gaussian_coverage(hpd_levels):
+    """
+    Draws samples from a STANDARD 2D GAUSSIAN, whose true enclosed
+    probability mass at a given density threshold is known exactly,
+    unlike the project's own KDE surfaces. Evaluates hpd_levels at
+    the textbook 1/2/3-sigma mass fractions (39.3/86.5/98.9 percent)
+    and checks the fraction of samples actually at or above each
+    returned threshold matches the target to within Monte Carlo noise.
+
+    This is the test that caught the original bug: an earlier version
+    of hpd_levels summed density VALUES instead of counting samples,
+    which passed the hand-computed example above (since that example
+    only checked one threshold on a tiny, hand-picked array) but gave
+    thresholds enclosing only about 22/63/90 percent of samples here,
+    not 39.3/86.5/98.9 -- the code and the old test agreed with each
+    other but were both wrong, only a known distribution exposed it.
+    """
+    rng = np.random.default_rng(0)
+    n = 200_000
+    x = rng.standard_normal(n)
+    y = rng.standard_normal(n)
+    density_values = np.exp(-(x**2 + y**2) / 2.0) / (2.0 * np.pi)
+
+    mass_fractions = (0.393, 0.865, 0.989)
+    thresholds = hpd_levels(density_values, mass_fractions=mass_fractions)
+
+    for frac, thr in zip(mass_fractions, thresholds):
+        actual_coverage = np.mean(density_values >= thr)
+        assert actual_coverage == pytest.approx(frac, abs=0.01)
 
 
 @pytest.mark.parametrize("hpd_levels", [mc_bunburra.hpd_levels, mc_cavezzo.hpd_levels])
