@@ -52,6 +52,37 @@ def load_digitized_height(path):
     return t_data[order], h_data[order]
 
 
+def height_validation_rmse(sol, t_data, h_data):
+    """
+    RMSE between the model's height-vs-time curve and digitized
+    reference points, evaluated at the exact digitized time stamps
+    (via the dense_output solution) rather than just overlaying both
+    on a plot and eyeballing the match.
+
+    Parameters
+    ----------
+    sol : OdeResult
+        Result of run_trajectory(..., dense_output=True).
+    t_data, h_data : ndarray
+        Digitized (time [s], height [km]) points, as returned by
+        load_digitized_height().
+
+    Returns
+    -------
+    rmse_km, max_abs_error_km : float
+        RMSE and max absolute error, in km. Points with a digitized
+        time past the end of the solved trajectory (e.g. past ground
+        impact) are dropped first.
+    """
+    mask = t_data <= sol.t[-1]
+    t_valid, h_valid = t_data[mask], h_data[mask]
+    h_model_km = sol.sol(t_valid)[0] / 1000.0  # m -> km
+    residuals = h_model_km - h_valid
+    rmse_km = np.sqrt(np.mean(residuals ** 2))
+    max_abs_error_km = np.max(np.abs(residuals))
+    return rmse_km, max_abs_error_km
+
+
 def plot_full_trajectory():
     y0 = initial_state()
     t_span = (0.0, 600.0)
@@ -127,6 +158,10 @@ def plot_full_trajectory():
         t_data, h_data = load_digitized_height(DIGITIZED_FILE)
         ax.plot(t_data, h_data, "o", color="tab:orange", markersize=5,
                  alpha=0.7, label="Digitized (Gardiol et al. 2021, Fig. 4a)")
+        rmse_km, max_err_km = height_validation_rmse(sol, t_data, h_data)
+        print(f"Height validation vs. digitized Fig. 4a: "
+              f"RMSE = {rmse_km:.3f} km, max error = {max_err_km:.3f} km "
+              f"({len(t_data)} points, 0-6 s)")
     except FileNotFoundError:
         print(f"Note: '{DIGITIZED_FILE}' not found — skipping digitized "
               f"overlay on the validation panel.")
