@@ -1,7 +1,7 @@
-numpy
-scipy
-matplotlib
-pytest
-pdoc
-line_profiler
-scalene
+line_profiler==5.0.2
+matplotlib==3.10.3
+numpy==2.3.2
+pdoc==16.0.0
+pytest==9.1.1
+scalene==2.3.0
+scipy==1.16.1
