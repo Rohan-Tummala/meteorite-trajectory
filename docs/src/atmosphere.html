@@ -321,7 +321,7 @@ rho = density(h, model="table")   # or model="exp"
 </span><span id="L-228"><a href="#L-228"><span class="linenos">228</span></a><span class="sd">    interp_kind : str, optional</span>
 </span><span id="L-229"><a href="#L-229"><span class="linenos">229</span></a><span class="sd">        Interpolation method label shown in the legend. Currently the</span>
 </span><span id="L-230"><a href="#L-230"><span class="linenos">230</span></a><span class="sd">        underlying interpolator is fixed to "linear" (see</span>
-</span><span id="L-231"><a href="#L-231"><span class="linenos">231</span></a><span class="sd">        `_density_interpolator`); this parameter only affects the</span>
+</span><span id="L-231"><a href="#L-231"><span class="linenos">231</span></a><span class="sd">        `tabulated_density`); this parameter only affects the</span>
 </span><span id="L-232"><a href="#L-232"><span class="linenos">232</span></a><span class="sd">        legend text until cubic interpolation is added. Default "linear".</span>
 </span><span id="L-233"><a href="#L-233"><span class="linenos">233</span></a><span class="sd">    """</span>
 </span><span id="L-234"><a href="#L-234"><span class="linenos">234</span></a>    <span class="n">h_fine</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">_TABLE_ALTITUDE_M</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span> <span class="mi">500</span><span class="p">)</span>
@@ -673,7 +673,7 @@ model : str, optional
 </span><span id="plot_atmosphere_comparison-229"><a href="#plot_atmosphere_comparison-229"><span class="linenos">229</span></a><span class="sd">    interp_kind : str, optional</span>
 </span><span id="plot_atmosphere_comparison-230"><a href="#plot_atmosphere_comparison-230"><span class="linenos">230</span></a><span class="sd">        Interpolation method label shown in the legend. Currently the</span>
 </span><span id="plot_atmosphere_comparison-231"><a href="#plot_atmosphere_comparison-231"><span class="linenos">231</span></a><span class="sd">        underlying interpolator is fixed to "linear" (see</span>
-</span><span id="plot_atmosphere_comparison-232"><a href="#plot_atmosphere_comparison-232"><span class="linenos">232</span></a><span class="sd">        `_density_interpolator`); this parameter only affects the</span>
+</span><span id="plot_atmosphere_comparison-232"><a href="#plot_atmosphere_comparison-232"><span class="linenos">232</span></a><span class="sd">        `tabulated_density`); this parameter only affects the</span>
 </span><span id="plot_atmosphere_comparison-233"><a href="#plot_atmosphere_comparison-233"><span class="linenos">233</span></a><span class="sd">        legend text until cubic interpolation is added. Default "linear".</span>
 </span><span id="plot_atmosphere_comparison-234"><a href="#plot_atmosphere_comparison-234"><span class="linenos">234</span></a><span class="sd">    """</span>
 </span><span id="plot_atmosphere_comparison-235"><a href="#plot_atmosphere_comparison-235"><span class="linenos">235</span></a>    <span class="n">h_fine</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">_TABLE_ALTITUDE_M</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span> <span class="mi">500</span><span class="p">)</span>
@@ -725,7 +725,7 @@ pass interp_kind="cubic" once that is implemented to compare).</p>
 <p>interp_kind : str, optional
     Interpolation method label shown in the legend. Currently the
     underlying interpolator is fixed to "linear" (see
-    <code>_density_interpolator</code>); this parameter only affects the
+    <code><a href="#tabulated_density">tabulated_density</a></code>); this parameter only affects the
     legend text until cubic interpolation is added. Default "linear".</p>
 </div>
 
