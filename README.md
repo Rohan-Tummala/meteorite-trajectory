@@ -195,11 +195,14 @@ meteorite-trajectory/
 │   ├── monte_carlo_uncertainty_*.py       # Monte Carlo sampling + probability-contour maps
 │   └── run_all.py                         # runs all deliverable scripts in sequence
 ├── test/                                  # pytest test suite (see Testing, below)
+├── report/                                # final written project report (PDF, frozen submitted version)
 ├── docs/                                  # pdoc HTML documentation of src/ (open docs/index.html)
 ├── conftest.py                            # adds src/ to the import path for tests
 ├── pytest.ini                             # pytest configuration
 └── requirements.txt
 ```
+
+The final written report is in `report/MMA3001_Report_Final.pdf`.
 
 Source documentation is generated with `pdoc` and checked into `docs/`.
 Open `docs/index.html` in a browser to view it, or regenerate it after a
