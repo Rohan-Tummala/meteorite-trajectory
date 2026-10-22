@@ -6,7 +6,7 @@ validation for both falls, numerical-methods comparison, piecewise
 stepping, wind comparison, wind plausibility check, both Monte Carlo
 runs, and the numerical/performance validation scripts (DOP853
 tolerance check, fitted convergence order, terminal-point check,
-sensitivity sweep, profiling comparison). Excludes the core
+sensitivity sweep, profiling comparison, FLOP count estimate). Excludes the core
 physics/data modules (atmosphere.py, dynamics.py, gravity.py,
 wind.py, integrator.py, fixed_step_integrators.py, bunburra.py,
 cavezzo.py), which are not standalone deliverables, and profiler.py
@@ -35,6 +35,7 @@ SCRIPTS = [
     ("Terminal-point check", "terminal_point_check.py"),
     ("Cd/sigma_abl sensitivity sweep", "sensitivity_sweep.py"),
     ("Interpolation profiling comparison", "profile_compare.py"),
+    ("FLOP count estimate", "flops_estimate.py"),
 ]
 
 if __name__ == "__main__":
