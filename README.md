@@ -84,6 +84,15 @@ comparing the original `scipy.interpolate.interp1d`-based implementation
 (`atmosphere_OLD_interp1d.py`) against the current `numpy.interp`-based
 one, confirming the replacement is both faster and numerically identical.
 
+`flops_estimate.py` gives a rough operation count for the trajectory model.
+It reads the number of RHS evaluations in a production RK45 run from
+`solve_ivp`, counts the arithmetic in one `meteor_rhs` call by running it on
+a counting number class, and times a call to get the achieved FLOP/s. The
+expensive functions (sin, cos, cube root) are weighted using the relative
+costs from counted-float (n.d.), so the result is given as a range. It shows
+the model runs far below hardware FLOP/s, so the runtime is limited by Python
+overhead and not arithmetic.
+
 Separately, comparing the deterministic trajectory output against each
 paper's reported terminal-point values (see Testing, below) separates
 numerical integration error (how far a method's result is from the
@@ -181,6 +190,7 @@ meteorite-trajectory/
 │   ├── convergence_order_check.py         # fits global convergence order of RK2/RK4 by step-halving
 │   ├── sensitivity_sweep.py               # one-at-a-time Cd/sigma_abl sweep, both falls
 │   ├── profile_compare.py                 # interp1d vs. np.interp atmosphere-lookup profiling
+│   ├── flops_estimate.py                  # rough FLOP count and FLOP/s per RHS call and per RK45 run
 │   ├── profiler.py / profile_memory.py    # cProfile / Scalene profiling helpers
 │   ├── monte_carlo_uncertainty_*.py       # Monte Carlo sampling + probability-contour maps
 │   └── run_all.py                         # runs all deliverable scripts in sequence
@@ -196,8 +206,16 @@ Open `docs/index.html` in a browser to view it, or regenerate it after a
 code change with:
 
 ```bash
-pdoc -o docs src
+# Linux / macOS
+PYTHONPATH=src python -m pdoc -o docs src
+
+# Windows (Command Prompt)
+set PYTHONPATH=src
+python -m pdoc -o docs src
 ```
+
+`PYTHONPATH=src` is needed because the modules in `src/` import each other
+by plain name (e.g. `from fixed_step_integrators import rk2_step`).
 
 ## Requirements
 
@@ -232,6 +250,7 @@ python monte_carlo_uncertainty_cavezzo.py  # Cavezzo probability map
 python sensitivity_sweep.py                # Cd/sigma_abl sensitivity, both falls
 python roundoff_test.py                    # DOP853 tolerance convergence check
 python convergence_order_check.py          # fitted RK2/RK4 convergence order
+python flops_estimate.py                   # RHS calls per run, FLOPs per call, achieved FLOP/s
 ```
 
 The Monte Carlo scripts cache their sampled results (`mc_cache_*.npz`) so
@@ -297,6 +316,10 @@ Expected result: **89 passed, 2 xfailed** (91 tests total).
   *U.S. Standard Atmosphere, 1976.* U.S. Government Printing Office.
   Defining equations implemented directly in `atmosphere.py`'s tabulated
   density model.
+- counted-float. (n.d.). *FLOP weights*. Retrieved October 22, 2026, from
+  https://counted-float.readthedocs.io/en/stable/flop_weights/. Relative
+  operation costs used to weight sin, cos and the cube root in
+  `flops_estimate.py`.
 
 ## License
 
