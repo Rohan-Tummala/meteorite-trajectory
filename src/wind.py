@@ -1,38 +1,22 @@
 """
 wind.py
 
-A simplified wind-drift model for the dark-flight phase, based on the
-wind profile Gardiol et al. (2021) report for the Cavezzo area at
-18 UTC on the day of the fall (Fig. 5 and Section 3.4).
+Simplified dark-flight wind-drift model for Cavezzo, based on the wind
+profile in Gardiol et al. (2021, Section 3.4 and Fig. 5).
 
-What the paper actually states (Section 3.4):
-    - ~28 m/s at ~22 km altitude (the last observed point of the
-      luminous path), blowing at 45 deg clockwise relative to the
-      meteoroid's own ground-track motion direction.
-    - Decreasing to ~20 m/s at 20 km altitude.
-    - Below 10 m/s from 13 km downward.
+From the paper: about 28 m/s at 22 km, about 20 m/s at 20 km and below
+10 m/s from 13 km down, blowing 45 deg clockwise of the meteoroid's
+ground-track heading.
 
-The paper does NOT give a precise profile below 13 km or above 22 km,
-or how direction varies with altitude below 22 km. This module fills
-those gaps with explicit, flagged assumptions:
-    - Wind direction is held constant (45 deg clockwise of travel
-      heading) at all altitudes where wind is applied, since the
-      paper gives no data suggesting otherwise.
-    - Speed is linearly interpolated between the paper's own points
-      (13, 20, 22 km), and linearly extrapolated down to a small
-      residual value (5 m/s) at the ground - this last piece is an
-      assumption, not from the paper.
-    - Above 22 km, wind is set to zero: no data is given, and at that
-      altitude the meteoroid's own speed (multiple km/s) is so much
-      larger than any plausible wind speed that the omission has
-      negligible effect on the luminous-flight portion anyway.
+Assumptions (not in the paper):
+    - Direction is constant at 45 deg clockwise of the travel heading.
+    - Speed is interpolated linearly between the paper's points
+      (13, 20 and 22 km) and falls to 5 m/s at the ground.
+    - Wind is zero above 22 km, where the meteoroid's speed is far
+      larger than any plausible wind speed.
 
-This is a SIMPLIFIED drift model: wind is added directly as an extra
-horizontal ground-velocity term (advection), not fully coupled into
-the relative-velocity drag calculation. This is a common
-simplification for illustrating wind's effect on drift, but is not
-as rigorous as solving for drag against the true air-relative
-velocity vector.
+Wind is added as an extra horizontal velocity term and is not coupled
+into the drag calculation, so this is a simplification.
 """
 
 import numpy as np

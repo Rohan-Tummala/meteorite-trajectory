@@ -164,45 +164,28 @@ def run_monte_carlo(n_samples=N_SAMPLES, seed=RANDOM_SEED):
 
 def hpd_levels(density_values, mass_fractions=(0.393, 0.865, 0.989)):
     """
-    Find density thresholds enclosing given highest-posterior-density
-    (HPD) probability masses, for contour levels on a KDE surface.
+    Find density thresholds that enclose given probability masses (HPD
+    contours) on a KDE surface.
 
-    Sorts the density evaluated at every sample point, then finds the
-    threshold such that the given FRACTION OF SAMPLES (by count, not
-    by summed density) lies at or above it -- NOT the naive 1D
-    68.3/95.4/99.7% percentile bands. Because the Monte Carlo samples
-    are already drawn proportional to the underlying distribution,
-    the fraction of samples above a density threshold is itself a
-    direct empirical estimate of the probability mass enclosed by
-    that threshold's contour. Default mass fractions are the true 2D
-    Gaussian-equivalent 1-sigma/2-sigma/3-sigma enclosed
-    probabilities, matching the convention Gardiol et al. (2021) use
-    for their published Cavezzo strewn-field ellipse.
-
-    An earlier version of this function summed the density VALUES
-    themselves (cumsum over sorted density, normalized) instead of
-    counting samples. That over-weights the highest-density points,
-    so the cumulative sum reaches a given fraction after far fewer
-    samples than it should, pushing every threshold too high and
-    every contour too narrow. Checked against a known 2D standard
-    Gaussian: the old version's nominal 39.3/86.5/98.9 percent
-    contours actually enclosed about 22/63/90 percent of samples.
-    This version was checked against the same Gaussian and recovers
-    the correct coverage (see test_monte_carlo.py).
+    Sorts the density at every sample point and, for each mass fraction,
+    returns the density above which that fraction of samples (by count)
+    lies. The samples are drawn from the distribution itself, so this
+    fraction is an empirical estimate of the probability mass inside the
+    contour. The default fractions are the 2D equivalents of 1, 2 and 3
+    sigma. Checked against a known 2D Gaussian in test_monte_carlo.py.
 
     Parameters
     ----------
     density_values : ndarray
         KDE density evaluated at each sample point.
     mass_fractions : tuple of float, optional
-        Cumulative probability masses to find HPD thresholds for.
-        Default (0.393, 0.865, 0.989) -- 2D 1/2/3-sigma equivalents.
+        Probability masses to find thresholds for. Default
+        (0.393, 0.865, 0.989).
 
     Returns
     -------
     list of float
-        Density threshold for each requested mass fraction, in the
-        same order as mass_fractions.
+        Density threshold for each mass fraction, in the same order.
     """
     sorted_density = np.sort(density_values)[::-1]
     n = len(sorted_density)

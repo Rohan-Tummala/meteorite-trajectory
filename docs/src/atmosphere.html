@@ -236,136 +236,120 @@ rho = density(h, model="table")   # or model="exp"
 </span><span id="L-143"><a href="#L-143"><span class="linenos">143</span></a><span class="sd">    Tabulated atmosphere model: linear interpolation over a standard</span>
 </span><span id="L-144"><a href="#L-144"><span class="linenos">144</span></a><span class="sd">    atmosphere density table.</span>
 </span><span id="L-145"><a href="#L-145"><span class="linenos">145</span></a>
-</span><span id="L-146"><a href="#L-146"><span class="linenos">146</span></a><span class="sd">    Uses numpy.interp rather than scipy.interpolate.interp1d. Both do</span>
-</span><span id="L-147"><a href="#L-147"><span class="linenos">147</span></a><span class="sd">    the same linear interpolation, but interp1d's general-purpose</span>
-</span><span id="L-148"><a href="#L-148"><span class="linenos">148</span></a><span class="sd">    object overhead dominates runtime when called with a single</span>
-</span><span id="L-149"><a href="#L-149"><span class="linenos">149</span></a><span class="sd">    scalar altitude on every RHS evaluation of the ODE solver</span>
-</span><span id="L-150"><a href="#L-150"><span class="linenos">150</span></a><span class="sd">    (profiled, see Table 2 in the project report for the measured</span>
-</span><span id="L-151"><a href="#L-151"><span class="linenos">151</span></a><span class="sd">    before/after split). np.interp is a</span>
-</span><span id="L-152"><a href="#L-152"><span class="linenos">152</span></a><span class="sd">    dedicated 1D linear-interpolation routine with far less per-call</span>
-</span><span id="L-153"><a href="#L-153"><span class="linenos">153</span></a><span class="sd">    overhead for exactly this use pattern.</span>
-</span><span id="L-154"><a href="#L-154"><span class="linenos">154</span></a>
-</span><span id="L-155"><a href="#L-155"><span class="linenos">155</span></a><span class="sd">    One behavioural difference from the previous interp1d-based</span>
-</span><span id="L-156"><a href="#L-156"><span class="linenos">156</span></a><span class="sd">    version: np.interp does not extrapolate. A value outside the</span>
-</span><span id="L-157"><a href="#L-157"><span class="linenos">157</span></a><span class="sd">    table range (0 to 86,000 m) is clamped to the nearest table</span>
-</span><span id="L-158"><a href="#L-158"><span class="linenos">158</span></a><span class="sd">    boundary's density, rather than linearly extrapolated. This is</span>
-</span><span id="L-159"><a href="#L-159"><span class="linenos">159</span></a><span class="sd">    arguably safer, it cannot return a negative density the way</span>
-</span><span id="L-160"><a href="#L-160"><span class="linenos">160</span></a><span class="sd">    linear extrapolation technically could, and a model straying this</span>
-</span><span id="L-161"><a href="#L-161"><span class="linenos">161</span></a><span class="sd">    far out of range (e.g. a diverging integration) is already</span>
-</span><span id="L-162"><a href="#L-162"><span class="linenos">162</span></a><span class="sd">    flagged elsewhere by the caller's own stability checks regardless</span>
-</span><span id="L-163"><a href="#L-163"><span class="linenos">163</span></a><span class="sd">    of what density value is returned here.</span>
+</span><span id="L-146"><a href="#L-146"><span class="linenos">146</span></a><span class="sd">    Uses numpy.interp, which is faster than scipy.interpolate.interp1d for</span>
+</span><span id="L-147"><a href="#L-147"><span class="linenos">147</span></a><span class="sd">    a single scalar altitude per call (see Table 3 in the project report).</span>
+</span><span id="L-148"><a href="#L-148"><span class="linenos">148</span></a><span class="sd">    np.interp does not extrapolate, so altitudes outside the table</span>
+</span><span id="L-149"><a href="#L-149"><span class="linenos">149</span></a><span class="sd">    (0 to 86,000 m) return the density at the nearest table boundary.</span>
+</span><span id="L-150"><a href="#L-150"><span class="linenos">150</span></a>
+</span><span id="L-151"><a href="#L-151"><span class="linenos">151</span></a><span class="sd">    Parameters</span>
+</span><span id="L-152"><a href="#L-152"><span class="linenos">152</span></a><span class="sd">    ----------</span>
+</span><span id="L-153"><a href="#L-153"><span class="linenos">153</span></a><span class="sd">    h : float or array_like</span>
+</span><span id="L-154"><a href="#L-154"><span class="linenos">154</span></a><span class="sd">        Altitude above sea level, in metres.</span>
+</span><span id="L-155"><a href="#L-155"><span class="linenos">155</span></a>
+</span><span id="L-156"><a href="#L-156"><span class="linenos">156</span></a><span class="sd">    Returns</span>
+</span><span id="L-157"><a href="#L-157"><span class="linenos">157</span></a><span class="sd">    -------</span>
+</span><span id="L-158"><a href="#L-158"><span class="linenos">158</span></a><span class="sd">    float or ndarray</span>
+</span><span id="L-159"><a href="#L-159"><span class="linenos">159</span></a><span class="sd">        Atmospheric density in kg/m^3.</span>
+</span><span id="L-160"><a href="#L-160"><span class="linenos">160</span></a><span class="sd">    """</span>
+</span><span id="L-161"><a href="#L-161"><span class="linenos">161</span></a>    <span class="n">h</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+</span><span id="L-162"><a href="#L-162"><span class="linenos">162</span></a>    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">_TABLE_ALTITUDE_M</span><span class="p">,</span> <span class="n">_TABLE_DENSITY_KGM3</span><span class="p">)</span>
+</span><span id="L-163"><a href="#L-163"><span class="linenos">163</span></a>
 </span><span id="L-164"><a href="#L-164"><span class="linenos">164</span></a>
-</span><span id="L-165"><a href="#L-165"><span class="linenos">165</span></a><span class="sd">    Parameters</span>
-</span><span id="L-166"><a href="#L-166"><span class="linenos">166</span></a><span class="sd">    ----------</span>
-</span><span id="L-167"><a href="#L-167"><span class="linenos">167</span></a><span class="sd">    h : float or array_like</span>
-</span><span id="L-168"><a href="#L-168"><span class="linenos">168</span></a><span class="sd">        Altitude above sea level, in metres. Values outside the table</span>
-</span><span id="L-169"><a href="#L-169"><span class="linenos">169</span></a><span class="sd">        range are clamped to the nearest boundary density rather than</span>
-</span><span id="L-170"><a href="#L-170"><span class="linenos">170</span></a><span class="sd">        extrapolated.</span>
-</span><span id="L-171"><a href="#L-171"><span class="linenos">171</span></a>
-</span><span id="L-172"><a href="#L-172"><span class="linenos">172</span></a><span class="sd">    Returns</span>
-</span><span id="L-173"><a href="#L-173"><span class="linenos">173</span></a><span class="sd">    -------</span>
-</span><span id="L-174"><a href="#L-174"><span class="linenos">174</span></a><span class="sd">    float or ndarray</span>
-</span><span id="L-175"><a href="#L-175"><span class="linenos">175</span></a><span class="sd">        Atmospheric density in kg/m^3.</span>
-</span><span id="L-176"><a href="#L-176"><span class="linenos">176</span></a><span class="sd">    """</span>
-</span><span id="L-177"><a href="#L-177"><span class="linenos">177</span></a>    <span class="n">h</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
-</span><span id="L-178"><a href="#L-178"><span class="linenos">178</span></a>    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">_TABLE_ALTITUDE_M</span><span class="p">,</span> <span class="n">_TABLE_DENSITY_KGM3</span><span class="p">)</span>
-</span><span id="L-179"><a href="#L-179"><span class="linenos">179</span></a>
+</span><span id="L-165"><a href="#L-165"><span class="linenos">165</span></a><span class="c1"># ---------------------------------------------------------------------</span>
+</span><span id="L-166"><a href="#L-166"><span class="linenos">166</span></a><span class="c1"># Dispatcher</span>
+</span><span id="L-167"><a href="#L-167"><span class="linenos">167</span></a><span class="c1"># ---------------------------------------------------------------------</span>
+</span><span id="L-168"><a href="#L-168"><span class="linenos">168</span></a>
+</span><span id="L-169"><a href="#L-169"><span class="linenos">169</span></a><span class="k">def</span><span class="w"> </span><span class="nf">density</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">"exp"</span><span class="p">):</span>
+</span><span id="L-170"><a href="#L-170"><span class="linenos">170</span></a><span class="w">    </span><span class="sd">"""</span>
+</span><span id="L-171"><a href="#L-171"><span class="linenos">171</span></a><span class="sd">    Select and evaluate an atmospheric density model by name.</span>
+</span><span id="L-172"><a href="#L-172"><span class="linenos">172</span></a>
+</span><span id="L-173"><a href="#L-173"><span class="linenos">173</span></a><span class="sd">    Parameters</span>
+</span><span id="L-174"><a href="#L-174"><span class="linenos">174</span></a><span class="sd">    ----------</span>
+</span><span id="L-175"><a href="#L-175"><span class="linenos">175</span></a><span class="sd">    h : float or array_like</span>
+</span><span id="L-176"><a href="#L-176"><span class="linenos">176</span></a><span class="sd">        Altitude above sea level, in metres.</span>
+</span><span id="L-177"><a href="#L-177"><span class="linenos">177</span></a><span class="sd">    model : str, optional</span>
+</span><span id="L-178"><a href="#L-178"><span class="linenos">178</span></a><span class="sd">        Which model to use: "exp" for the exponential approximation,</span>
+</span><span id="L-179"><a href="#L-179"><span class="linenos">179</span></a><span class="sd">        or "table" for the tabulated/interpolated model. Default "exp".</span>
 </span><span id="L-180"><a href="#L-180"><span class="linenos">180</span></a>
-</span><span id="L-181"><a href="#L-181"><span class="linenos">181</span></a><span class="c1"># ---------------------------------------------------------------------</span>
-</span><span id="L-182"><a href="#L-182"><span class="linenos">182</span></a><span class="c1"># Dispatcher</span>
-</span><span id="L-183"><a href="#L-183"><span class="linenos">183</span></a><span class="c1"># ---------------------------------------------------------------------</span>
-</span><span id="L-184"><a href="#L-184"><span class="linenos">184</span></a>
-</span><span id="L-185"><a href="#L-185"><span class="linenos">185</span></a><span class="k">def</span><span class="w"> </span><span class="nf">density</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">"exp"</span><span class="p">):</span>
-</span><span id="L-186"><a href="#L-186"><span class="linenos">186</span></a><span class="w">    </span><span class="sd">"""</span>
-</span><span id="L-187"><a href="#L-187"><span class="linenos">187</span></a><span class="sd">    Select and evaluate an atmospheric density model by name.</span>
-</span><span id="L-188"><a href="#L-188"><span class="linenos">188</span></a>
-</span><span id="L-189"><a href="#L-189"><span class="linenos">189</span></a><span class="sd">    Parameters</span>
-</span><span id="L-190"><a href="#L-190"><span class="linenos">190</span></a><span class="sd">    ----------</span>
-</span><span id="L-191"><a href="#L-191"><span class="linenos">191</span></a><span class="sd">    h : float or array_like</span>
-</span><span id="L-192"><a href="#L-192"><span class="linenos">192</span></a><span class="sd">        Altitude above sea level, in metres.</span>
-</span><span id="L-193"><a href="#L-193"><span class="linenos">193</span></a><span class="sd">    model : str, optional</span>
-</span><span id="L-194"><a href="#L-194"><span class="linenos">194</span></a><span class="sd">        Which model to use: "exp" for the exponential approximation,</span>
-</span><span id="L-195"><a href="#L-195"><span class="linenos">195</span></a><span class="sd">        or "table" for the tabulated/interpolated model. Default "exp".</span>
-</span><span id="L-196"><a href="#L-196"><span class="linenos">196</span></a>
-</span><span id="L-197"><a href="#L-197"><span class="linenos">197</span></a><span class="sd">    Returns</span>
-</span><span id="L-198"><a href="#L-198"><span class="linenos">198</span></a><span class="sd">    -------</span>
-</span><span id="L-199"><a href="#L-199"><span class="linenos">199</span></a><span class="sd">    float or ndarray</span>
-</span><span id="L-200"><a href="#L-200"><span class="linenos">200</span></a><span class="sd">        Atmospheric density in kg/m^3.</span>
-</span><span id="L-201"><a href="#L-201"><span class="linenos">201</span></a>
-</span><span id="L-202"><a href="#L-202"><span class="linenos">202</span></a><span class="sd">    Raises</span>
-</span><span id="L-203"><a href="#L-203"><span class="linenos">203</span></a><span class="sd">    ------</span>
-</span><span id="L-204"><a href="#L-204"><span class="linenos">204</span></a><span class="sd">    ValueError</span>
-</span><span id="L-205"><a href="#L-205"><span class="linenos">205</span></a><span class="sd">        If `model` is not "exp" or "table".</span>
-</span><span id="L-206"><a href="#L-206"><span class="linenos">206</span></a><span class="sd">    """</span>
-</span><span id="L-207"><a href="#L-207"><span class="linenos">207</span></a>    <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"exp"</span><span class="p">:</span>
-</span><span id="L-208"><a href="#L-208"><span class="linenos">208</span></a>        <span class="k">return</span> <span class="n">exponential_density</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
-</span><span id="L-209"><a href="#L-209"><span class="linenos">209</span></a>    <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"table"</span><span class="p">:</span>
-</span><span id="L-210"><a href="#L-210"><span class="linenos">210</span></a>        <span class="k">return</span> <span class="n">tabulated_density</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
-</span><span id="L-211"><a href="#L-211"><span class="linenos">211</span></a>    <span class="k">else</span><span class="p">:</span>
-</span><span id="L-212"><a href="#L-212"><span class="linenos">212</span></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown atmosphere model '</span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s2">'. Use 'exp' or 'table'."</span><span class="p">)</span>
-</span><span id="L-213"><a href="#L-213"><span class="linenos">213</span></a>
-</span><span id="L-214"><a href="#L-214"><span class="linenos">214</span></a>
-</span><span id="L-215"><a href="#L-215"><span class="linenos">215</span></a><span class="k">def</span><span class="w"> </span><span class="nf">plot_atmosphere_comparison</span><span class="p">(</span><span class="n">interp_kind</span><span class="o">=</span><span class="s2">"linear"</span><span class="p">):</span>
-</span><span id="L-216"><a href="#L-216"><span class="linenos">216</span></a><span class="w">    </span><span class="sd">"""</span>
-</span><span id="L-217"><a href="#L-217"><span class="linenos">217</span></a><span class="sd">    Plot the exponential and tabulated density models on the same</span>
-</span><span id="L-218"><a href="#L-218"><span class="linenos">218</span></a><span class="sd">    axes for visual comparison.</span>
+</span><span id="L-181"><a href="#L-181"><span class="linenos">181</span></a><span class="sd">    Returns</span>
+</span><span id="L-182"><a href="#L-182"><span class="linenos">182</span></a><span class="sd">    -------</span>
+</span><span id="L-183"><a href="#L-183"><span class="linenos">183</span></a><span class="sd">    float or ndarray</span>
+</span><span id="L-184"><a href="#L-184"><span class="linenos">184</span></a><span class="sd">        Atmospheric density in kg/m^3.</span>
+</span><span id="L-185"><a href="#L-185"><span class="linenos">185</span></a>
+</span><span id="L-186"><a href="#L-186"><span class="linenos">186</span></a><span class="sd">    Raises</span>
+</span><span id="L-187"><a href="#L-187"><span class="linenos">187</span></a><span class="sd">    ------</span>
+</span><span id="L-188"><a href="#L-188"><span class="linenos">188</span></a><span class="sd">    ValueError</span>
+</span><span id="L-189"><a href="#L-189"><span class="linenos">189</span></a><span class="sd">        If `model` is not "exp" or "table".</span>
+</span><span id="L-190"><a href="#L-190"><span class="linenos">190</span></a><span class="sd">    """</span>
+</span><span id="L-191"><a href="#L-191"><span class="linenos">191</span></a>    <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"exp"</span><span class="p">:</span>
+</span><span id="L-192"><a href="#L-192"><span class="linenos">192</span></a>        <span class="k">return</span> <span class="n">exponential_density</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
+</span><span id="L-193"><a href="#L-193"><span class="linenos">193</span></a>    <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"table"</span><span class="p">:</span>
+</span><span id="L-194"><a href="#L-194"><span class="linenos">194</span></a>        <span class="k">return</span> <span class="n">tabulated_density</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
+</span><span id="L-195"><a href="#L-195"><span class="linenos">195</span></a>    <span class="k">else</span><span class="p">:</span>
+</span><span id="L-196"><a href="#L-196"><span class="linenos">196</span></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown atmosphere model '</span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s2">'. Use 'exp' or 'table'."</span><span class="p">)</span>
+</span><span id="L-197"><a href="#L-197"><span class="linenos">197</span></a>
+</span><span id="L-198"><a href="#L-198"><span class="linenos">198</span></a>
+</span><span id="L-199"><a href="#L-199"><span class="linenos">199</span></a><span class="k">def</span><span class="w"> </span><span class="nf">plot_atmosphere_comparison</span><span class="p">(</span><span class="n">interp_kind</span><span class="o">=</span><span class="s2">"linear"</span><span class="p">):</span>
+</span><span id="L-200"><a href="#L-200"><span class="linenos">200</span></a><span class="w">    </span><span class="sd">"""</span>
+</span><span id="L-201"><a href="#L-201"><span class="linenos">201</span></a><span class="sd">    Plot the exponential and tabulated density models on the same</span>
+</span><span id="L-202"><a href="#L-202"><span class="linenos">202</span></a><span class="sd">    axes for visual comparison.</span>
+</span><span id="L-203"><a href="#L-203"><span class="linenos">203</span></a>
+</span><span id="L-204"><a href="#L-204"><span class="linenos">204</span></a><span class="sd">    The exponential model is drawn as a smooth solid curve. The</span>
+</span><span id="L-205"><a href="#L-205"><span class="linenos">205</span></a><span class="sd">    tabulated model is drawn as markers at the actual table points</span>
+</span><span id="L-206"><a href="#L-206"><span class="linenos">206</span></a><span class="sd">    connected by a dotted line, since that dotted line literally *is*</span>
+</span><span id="L-207"><a href="#L-207"><span class="linenos">207</span></a><span class="sd">    the interpolated result between data points (currently linear;</span>
+</span><span id="L-208"><a href="#L-208"><span class="linenos">208</span></a><span class="sd">    pass interp_kind="cubic" once that is implemented to compare).</span>
+</span><span id="L-209"><a href="#L-209"><span class="linenos">209</span></a>
+</span><span id="L-210"><a href="#L-210"><span class="linenos">210</span></a><span class="sd">    Parameters</span>
+</span><span id="L-211"><a href="#L-211"><span class="linenos">211</span></a><span class="sd">    ----------</span>
+</span><span id="L-212"><a href="#L-212"><span class="linenos">212</span></a><span class="sd">    interp_kind : str, optional</span>
+</span><span id="L-213"><a href="#L-213"><span class="linenos">213</span></a><span class="sd">        Interpolation method label shown in the legend. Currently the</span>
+</span><span id="L-214"><a href="#L-214"><span class="linenos">214</span></a><span class="sd">        underlying interpolator is fixed to "linear" (see</span>
+</span><span id="L-215"><a href="#L-215"><span class="linenos">215</span></a><span class="sd">        `tabulated_density`); this parameter only affects the</span>
+</span><span id="L-216"><a href="#L-216"><span class="linenos">216</span></a><span class="sd">        legend text until cubic interpolation is added. Default "linear".</span>
+</span><span id="L-217"><a href="#L-217"><span class="linenos">217</span></a><span class="sd">    """</span>
+</span><span id="L-218"><a href="#L-218"><span class="linenos">218</span></a>    <span class="n">h_fine</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">_TABLE_ALTITUDE_M</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span> <span class="mi">500</span><span class="p">)</span>
 </span><span id="L-219"><a href="#L-219"><span class="linenos">219</span></a>
-</span><span id="L-220"><a href="#L-220"><span class="linenos">220</span></a><span class="sd">    The exponential model is drawn as a smooth solid curve. The</span>
-</span><span id="L-221"><a href="#L-221"><span class="linenos">221</span></a><span class="sd">    tabulated model is drawn as markers at the actual table points</span>
-</span><span id="L-222"><a href="#L-222"><span class="linenos">222</span></a><span class="sd">    connected by a dotted line, since that dotted line literally *is*</span>
-</span><span id="L-223"><a href="#L-223"><span class="linenos">223</span></a><span class="sd">    the interpolated result between data points (currently linear;</span>
-</span><span id="L-224"><a href="#L-224"><span class="linenos">224</span></a><span class="sd">    pass interp_kind="cubic" once that is implemented to compare).</span>
+</span><span id="L-220"><a href="#L-220"><span class="linenos">220</span></a>    <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+</span><span id="L-221"><a href="#L-221"><span class="linenos">221</span></a>
+</span><span id="L-222"><a href="#L-222"><span class="linenos">222</span></a>    <span class="c1"># Exponential model: smooth curve over the full altitude range.</span>
+</span><span id="L-223"><a href="#L-223"><span class="linenos">223</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">h_fine</span><span class="p">,</span> <span class="n">exponential_density</span><span class="p">(</span><span class="n">h_fine</span><span class="p">),</span> <span class="s2">"-"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"tab:blue"</span><span class="p">,</span>
+</span><span id="L-224"><a href="#L-224"><span class="linenos">224</span></a>             <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"Exponential model"</span><span class="p">)</span>
 </span><span id="L-225"><a href="#L-225"><span class="linenos">225</span></a>
-</span><span id="L-226"><a href="#L-226"><span class="linenos">226</span></a><span class="sd">    Parameters</span>
-</span><span id="L-227"><a href="#L-227"><span class="linenos">227</span></a><span class="sd">    ----------</span>
-</span><span id="L-228"><a href="#L-228"><span class="linenos">228</span></a><span class="sd">    interp_kind : str, optional</span>
-</span><span id="L-229"><a href="#L-229"><span class="linenos">229</span></a><span class="sd">        Interpolation method label shown in the legend. Currently the</span>
-</span><span id="L-230"><a href="#L-230"><span class="linenos">230</span></a><span class="sd">        underlying interpolator is fixed to "linear" (see</span>
-</span><span id="L-231"><a href="#L-231"><span class="linenos">231</span></a><span class="sd">        `tabulated_density`); this parameter only affects the</span>
-</span><span id="L-232"><a href="#L-232"><span class="linenos">232</span></a><span class="sd">        legend text until cubic interpolation is added. Default "linear".</span>
-</span><span id="L-233"><a href="#L-233"><span class="linenos">233</span></a><span class="sd">    """</span>
-</span><span id="L-234"><a href="#L-234"><span class="linenos">234</span></a>    <span class="n">h_fine</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">_TABLE_ALTITUDE_M</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span> <span class="mi">500</span><span class="p">)</span>
-</span><span id="L-235"><a href="#L-235"><span class="linenos">235</span></a>
-</span><span id="L-236"><a href="#L-236"><span class="linenos">236</span></a>    <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
-</span><span id="L-237"><a href="#L-237"><span class="linenos">237</span></a>
-</span><span id="L-238"><a href="#L-238"><span class="linenos">238</span></a>    <span class="c1"># Exponential model: smooth curve over the full altitude range.</span>
-</span><span id="L-239"><a href="#L-239"><span class="linenos">239</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">h_fine</span><span class="p">,</span> <span class="n">exponential_density</span><span class="p">(</span><span class="n">h_fine</span><span class="p">),</span> <span class="s2">"-"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"tab:blue"</span><span class="p">,</span>
-</span><span id="L-240"><a href="#L-240"><span class="linenos">240</span></a>             <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"Exponential model"</span><span class="p">)</span>
-</span><span id="L-241"><a href="#L-241"><span class="linenos">241</span></a>
-</span><span id="L-242"><a href="#L-242"><span class="linenos">242</span></a>    <span class="c1"># COESA 1976 model: the true underlying curve, evaluated directly</span>
-</span><span id="L-243"><a href="#L-243"><span class="linenos">243</span></a>    <span class="c1"># (no interpolation). Plotted as a dashed line so it remains visible</span>
-</span><span id="L-244"><a href="#L-244"><span class="linenos">244</span></a>    <span class="c1"># even where it nearly overlaps the interpolated table below.</span>
-</span><span id="L-245"><a href="#L-245"><span class="linenos">245</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">h_fine</span><span class="p">,</span> <span class="n">coesa_density</span><span class="p">(</span><span class="n">h_fine</span><span class="p">),</span> <span class="s2">"--"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"tab:green"</span><span class="p">,</span>
-</span><span id="L-246"><a href="#L-246"><span class="linenos">246</span></a>             <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"COESA 1976 model (exact evaluation)"</span><span class="p">)</span>
-</span><span id="L-247"><a href="#L-247"><span class="linenos">247</span></a>
-</span><span id="L-248"><a href="#L-248"><span class="linenos">248</span></a>    <span class="c1"># Tabulated model: table points connected with a dotted line (this</span>
-</span><span id="L-249"><a href="#L-249"><span class="linenos">249</span></a>    <span class="c1"># dotted line *is* the interpolated result). Markers kept small</span>
-</span><span id="L-250"><a href="#L-250"><span class="linenos">250</span></a>    <span class="c1"># since the table is now densely sampled (1 km spacing).</span>
-</span><span id="L-251"><a href="#L-251"><span class="linenos">251</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">_TABLE_ALTITUDE_M</span><span class="p">,</span> <span class="n">_TABLE_DENSITY_KGM3</span><span class="p">,</span> <span class="s2">"o:"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"tab:orange"</span><span class="p">,</span>
-</span><span id="L-252"><a href="#L-252"><span class="linenos">252</span></a>             <span class="n">linewidth</span><span class="o">=</span><span class="mf">1.2</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-</span><span id="L-253"><a href="#L-253"><span class="linenos">253</span></a>             <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s2">"Tabulated model (</span><span class="si">{</span><span class="n">interp_kind</span><span class="si">}</span><span class="s2"> interpolation, "</span>
-</span><span id="L-254"><a href="#L-254"><span class="linenos">254</span></a>                   <span class="sa">f</span><span class="s2">"COESA 1976, 1 km spacing)"</span><span class="p">)</span>
-</span><span id="L-255"><a href="#L-255"><span class="linenos">255</span></a>
-</span><span id="L-256"><a href="#L-256"><span class="linenos">256</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">set_yscale</span><span class="p">(</span><span class="s2">"log"</span><span class="p">)</span>  <span class="c1"># density spans several orders of magnitude</span>
-</span><span id="L-257"><a href="#L-257"><span class="linenos">257</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">"Altitude, h (m)"</span><span class="p">)</span>
-</span><span id="L-258"><a href="#L-258"><span class="linenos">258</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">"Density, $\rho$ (kg/m$^3$)"</span><span class="p">)</span>
-</span><span id="L-259"><a href="#L-259"><span class="linenos">259</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">"Atmospheric density models: exponential vs. tabulated"</span><span class="p">)</span>
-</span><span id="L-260"><a href="#L-260"><span class="linenos">260</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
-</span><span id="L-261"><a href="#L-261"><span class="linenos">261</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">which</span><span class="o">=</span><span class="s2">"both"</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">"--"</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.4</span><span class="p">)</span>
-</span><span id="L-262"><a href="#L-262"><span class="linenos">262</span></a>    <span class="n">fig</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
-</span><span id="L-263"><a href="#L-263"><span class="linenos">263</span></a>    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
-</span><span id="L-264"><a href="#L-264"><span class="linenos">264</span></a>
-</span><span id="L-265"><a href="#L-265"><span class="linenos">265</span></a>    <span class="k">return</span> <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span>
-</span><span id="L-266"><a href="#L-266"><span class="linenos">266</span></a>
-</span><span id="L-267"><a href="#L-267"><span class="linenos">267</span></a>
-</span><span id="L-268"><a href="#L-268"><span class="linenos">268</span></a><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
-</span><span id="L-269"><a href="#L-269"><span class="linenos">269</span></a>    <span class="c1"># Manual verification when running this file directly.</span>
-</span><span id="L-270"><a href="#L-270"><span class="linenos">270</span></a>    <span class="n">test_altitudes</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10000</span><span class="p">,</span> <span class="mi">21500</span><span class="p">,</span> <span class="mi">50000</span><span class="p">]</span>
-</span><span id="L-271"><a href="#L-271"><span class="linenos">271</span></a>    <span class="k">for</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">test_altitudes</span><span class="p">:</span>
-</span><span id="L-272"><a href="#L-272"><span class="linenos">272</span></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"h=</span><span class="si">{</span><span class="n">h</span><span class="si">:</span><span class="s2">&gt;6</span><span class="si">}</span><span class="s2"> m  exp=</span><span class="si">{</span><span class="n">density</span><span class="p">(</span><span class="n">h</span><span class="p">,</span><span class="w"> </span><span class="s1">'exp'</span><span class="p">)</span><span class="si">:</span><span class="s2">.6e</span><span class="si">}</span><span class="s2"> kg/m^3  "</span>
-</span><span id="L-273"><a href="#L-273"><span class="linenos">273</span></a>              <span class="sa">f</span><span class="s2">"table=</span><span class="si">{</span><span class="n">density</span><span class="p">(</span><span class="n">h</span><span class="p">,</span><span class="w"> </span><span class="s1">'table'</span><span class="p">)</span><span class="si">:</span><span class="s2">.6e</span><span class="si">}</span><span class="s2"> kg/m^3"</span><span class="p">)</span>
-</span><span id="L-274"><a href="#L-274"><span class="linenos">274</span></a>
-</span><span id="L-275"><a href="#L-275"><span class="linenos">275</span></a>    <span class="n">plot_atmosphere_comparison</span><span class="p">(</span><span class="n">interp_kind</span><span class="o">=</span><span class="s2">"linear"</span><span class="p">)</span>
+</span><span id="L-226"><a href="#L-226"><span class="linenos">226</span></a>    <span class="c1"># COESA 1976 model: the true underlying curve, evaluated directly</span>
+</span><span id="L-227"><a href="#L-227"><span class="linenos">227</span></a>    <span class="c1"># (no interpolation). Plotted as a dashed line so it remains visible</span>
+</span><span id="L-228"><a href="#L-228"><span class="linenos">228</span></a>    <span class="c1"># even where it nearly overlaps the interpolated table below.</span>
+</span><span id="L-229"><a href="#L-229"><span class="linenos">229</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">h_fine</span><span class="p">,</span> <span class="n">coesa_density</span><span class="p">(</span><span class="n">h_fine</span><span class="p">),</span> <span class="s2">"--"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"tab:green"</span><span class="p">,</span>
+</span><span id="L-230"><a href="#L-230"><span class="linenos">230</span></a>             <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"COESA 1976 model (exact evaluation)"</span><span class="p">)</span>
+</span><span id="L-231"><a href="#L-231"><span class="linenos">231</span></a>
+</span><span id="L-232"><a href="#L-232"><span class="linenos">232</span></a>    <span class="c1"># Tabulated model: table points connected with a dotted line (this</span>
+</span><span id="L-233"><a href="#L-233"><span class="linenos">233</span></a>    <span class="c1"># dotted line *is* the interpolated result). Markers kept small</span>
+</span><span id="L-234"><a href="#L-234"><span class="linenos">234</span></a>    <span class="c1"># since the table is now densely sampled (1 km spacing).</span>
+</span><span id="L-235"><a href="#L-235"><span class="linenos">235</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">_TABLE_ALTITUDE_M</span><span class="p">,</span> <span class="n">_TABLE_DENSITY_KGM3</span><span class="p">,</span> <span class="s2">"o:"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"tab:orange"</span><span class="p">,</span>
+</span><span id="L-236"><a href="#L-236"><span class="linenos">236</span></a>             <span class="n">linewidth</span><span class="o">=</span><span class="mf">1.2</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+</span><span id="L-237"><a href="#L-237"><span class="linenos">237</span></a>             <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s2">"Tabulated model (</span><span class="si">{</span><span class="n">interp_kind</span><span class="si">}</span><span class="s2"> interpolation, "</span>
+</span><span id="L-238"><a href="#L-238"><span class="linenos">238</span></a>                   <span class="sa">f</span><span class="s2">"COESA 1976, 1 km spacing)"</span><span class="p">)</span>
+</span><span id="L-239"><a href="#L-239"><span class="linenos">239</span></a>
+</span><span id="L-240"><a href="#L-240"><span class="linenos">240</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">set_yscale</span><span class="p">(</span><span class="s2">"log"</span><span class="p">)</span>  <span class="c1"># density spans several orders of magnitude</span>
+</span><span id="L-241"><a href="#L-241"><span class="linenos">241</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">"Altitude, h (m)"</span><span class="p">)</span>
+</span><span id="L-242"><a href="#L-242"><span class="linenos">242</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">"Density, $\rho$ (kg/m$^3$)"</span><span class="p">)</span>
+</span><span id="L-243"><a href="#L-243"><span class="linenos">243</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">"Atmospheric density models: exponential vs. tabulated"</span><span class="p">)</span>
+</span><span id="L-244"><a href="#L-244"><span class="linenos">244</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+</span><span id="L-245"><a href="#L-245"><span class="linenos">245</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">which</span><span class="o">=</span><span class="s2">"both"</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">"--"</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.4</span><span class="p">)</span>
+</span><span id="L-246"><a href="#L-246"><span class="linenos">246</span></a>    <span class="n">fig</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</span><span id="L-247"><a href="#L-247"><span class="linenos">247</span></a>    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</span><span id="L-248"><a href="#L-248"><span class="linenos">248</span></a>
+</span><span id="L-249"><a href="#L-249"><span class="linenos">249</span></a>    <span class="k">return</span> <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span>
+</span><span id="L-250"><a href="#L-250"><span class="linenos">250</span></a>
+</span><span id="L-251"><a href="#L-251"><span class="linenos">251</span></a>
+</span><span id="L-252"><a href="#L-252"><span class="linenos">252</span></a><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
+</span><span id="L-253"><a href="#L-253"><span class="linenos">253</span></a>    <span class="c1"># Manual verification when running this file directly.</span>
+</span><span id="L-254"><a href="#L-254"><span class="linenos">254</span></a>    <span class="n">test_altitudes</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10000</span><span class="p">,</span> <span class="mi">21500</span><span class="p">,</span> <span class="mi">50000</span><span class="p">]</span>
+</span><span id="L-255"><a href="#L-255"><span class="linenos">255</span></a>    <span class="k">for</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">test_altitudes</span><span class="p">:</span>
+</span><span id="L-256"><a href="#L-256"><span class="linenos">256</span></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"h=</span><span class="si">{</span><span class="n">h</span><span class="si">:</span><span class="s2">&gt;6</span><span class="si">}</span><span class="s2"> m  exp=</span><span class="si">{</span><span class="n">density</span><span class="p">(</span><span class="n">h</span><span class="p">,</span><span class="w"> </span><span class="s1">'exp'</span><span class="p">)</span><span class="si">:</span><span class="s2">.6e</span><span class="si">}</span><span class="s2"> kg/m^3  "</span>
+</span><span id="L-257"><a href="#L-257"><span class="linenos">257</span></a>              <span class="sa">f</span><span class="s2">"table=</span><span class="si">{</span><span class="n">density</span><span class="p">(</span><span class="n">h</span><span class="p">,</span><span class="w"> </span><span class="s1">'table'</span><span class="p">)</span><span class="si">:</span><span class="s2">.6e</span><span class="si">}</span><span class="s2"> kg/m^3"</span><span class="p">)</span>
+</span><span id="L-258"><a href="#L-258"><span class="linenos">258</span></a>
+</span><span id="L-259"><a href="#L-259"><span class="linenos">259</span></a>    <span class="n">plot_atmosphere_comparison</span><span class="p">(</span><span class="n">interp_kind</span><span class="o">=</span><span class="s2">"linear"</span><span class="p">)</span>
 </span></pre></div>
 
 
@@ -508,70 +492,38 @@ defining piecewise equations (not interpolated from a table).</p>
 </span><span id="tabulated_density-144"><a href="#tabulated_density-144"><span class="linenos">144</span></a><span class="sd">    Tabulated atmosphere model: linear interpolation over a standard</span>
 </span><span id="tabulated_density-145"><a href="#tabulated_density-145"><span class="linenos">145</span></a><span class="sd">    atmosphere density table.</span>
 </span><span id="tabulated_density-146"><a href="#tabulated_density-146"><span class="linenos">146</span></a>
-</span><span id="tabulated_density-147"><a href="#tabulated_density-147"><span class="linenos">147</span></a><span class="sd">    Uses numpy.interp rather than scipy.interpolate.interp1d. Both do</span>
-</span><span id="tabulated_density-148"><a href="#tabulated_density-148"><span class="linenos">148</span></a><span class="sd">    the same linear interpolation, but interp1d's general-purpose</span>
-</span><span id="tabulated_density-149"><a href="#tabulated_density-149"><span class="linenos">149</span></a><span class="sd">    object overhead dominates runtime when called with a single</span>
-</span><span id="tabulated_density-150"><a href="#tabulated_density-150"><span class="linenos">150</span></a><span class="sd">    scalar altitude on every RHS evaluation of the ODE solver</span>
-</span><span id="tabulated_density-151"><a href="#tabulated_density-151"><span class="linenos">151</span></a><span class="sd">    (profiled, see Table 2 in the project report for the measured</span>
-</span><span id="tabulated_density-152"><a href="#tabulated_density-152"><span class="linenos">152</span></a><span class="sd">    before/after split). np.interp is a</span>
-</span><span id="tabulated_density-153"><a href="#tabulated_density-153"><span class="linenos">153</span></a><span class="sd">    dedicated 1D linear-interpolation routine with far less per-call</span>
-</span><span id="tabulated_density-154"><a href="#tabulated_density-154"><span class="linenos">154</span></a><span class="sd">    overhead for exactly this use pattern.</span>
-</span><span id="tabulated_density-155"><a href="#tabulated_density-155"><span class="linenos">155</span></a>
-</span><span id="tabulated_density-156"><a href="#tabulated_density-156"><span class="linenos">156</span></a><span class="sd">    One behavioural difference from the previous interp1d-based</span>
-</span><span id="tabulated_density-157"><a href="#tabulated_density-157"><span class="linenos">157</span></a><span class="sd">    version: np.interp does not extrapolate. A value outside the</span>
-</span><span id="tabulated_density-158"><a href="#tabulated_density-158"><span class="linenos">158</span></a><span class="sd">    table range (0 to 86,000 m) is clamped to the nearest table</span>
-</span><span id="tabulated_density-159"><a href="#tabulated_density-159"><span class="linenos">159</span></a><span class="sd">    boundary's density, rather than linearly extrapolated. This is</span>
-</span><span id="tabulated_density-160"><a href="#tabulated_density-160"><span class="linenos">160</span></a><span class="sd">    arguably safer, it cannot return a negative density the way</span>
-</span><span id="tabulated_density-161"><a href="#tabulated_density-161"><span class="linenos">161</span></a><span class="sd">    linear extrapolation technically could, and a model straying this</span>
-</span><span id="tabulated_density-162"><a href="#tabulated_density-162"><span class="linenos">162</span></a><span class="sd">    far out of range (e.g. a diverging integration) is already</span>
-</span><span id="tabulated_density-163"><a href="#tabulated_density-163"><span class="linenos">163</span></a><span class="sd">    flagged elsewhere by the caller's own stability checks regardless</span>
-</span><span id="tabulated_density-164"><a href="#tabulated_density-164"><span class="linenos">164</span></a><span class="sd">    of what density value is returned here.</span>
-</span><span id="tabulated_density-165"><a href="#tabulated_density-165"><span class="linenos">165</span></a>
-</span><span id="tabulated_density-166"><a href="#tabulated_density-166"><span class="linenos">166</span></a><span class="sd">    Parameters</span>
-</span><span id="tabulated_density-167"><a href="#tabulated_density-167"><span class="linenos">167</span></a><span class="sd">    ----------</span>
-</span><span id="tabulated_density-168"><a href="#tabulated_density-168"><span class="linenos">168</span></a><span class="sd">    h : float or array_like</span>
-</span><span id="tabulated_density-169"><a href="#tabulated_density-169"><span class="linenos">169</span></a><span class="sd">        Altitude above sea level, in metres. Values outside the table</span>
-</span><span id="tabulated_density-170"><a href="#tabulated_density-170"><span class="linenos">170</span></a><span class="sd">        range are clamped to the nearest boundary density rather than</span>
-</span><span id="tabulated_density-171"><a href="#tabulated_density-171"><span class="linenos">171</span></a><span class="sd">        extrapolated.</span>
-</span><span id="tabulated_density-172"><a href="#tabulated_density-172"><span class="linenos">172</span></a>
-</span><span id="tabulated_density-173"><a href="#tabulated_density-173"><span class="linenos">173</span></a><span class="sd">    Returns</span>
-</span><span id="tabulated_density-174"><a href="#tabulated_density-174"><span class="linenos">174</span></a><span class="sd">    -------</span>
-</span><span id="tabulated_density-175"><a href="#tabulated_density-175"><span class="linenos">175</span></a><span class="sd">    float or ndarray</span>
-</span><span id="tabulated_density-176"><a href="#tabulated_density-176"><span class="linenos">176</span></a><span class="sd">        Atmospheric density in kg/m^3.</span>
-</span><span id="tabulated_density-177"><a href="#tabulated_density-177"><span class="linenos">177</span></a><span class="sd">    """</span>
-</span><span id="tabulated_density-178"><a href="#tabulated_density-178"><span class="linenos">178</span></a>    <span class="n">h</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
-</span><span id="tabulated_density-179"><a href="#tabulated_density-179"><span class="linenos">179</span></a>    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">_TABLE_ALTITUDE_M</span><span class="p">,</span> <span class="n">_TABLE_DENSITY_KGM3</span><span class="p">)</span>
+</span><span id="tabulated_density-147"><a href="#tabulated_density-147"><span class="linenos">147</span></a><span class="sd">    Uses numpy.interp, which is faster than scipy.interpolate.interp1d for</span>
+</span><span id="tabulated_density-148"><a href="#tabulated_density-148"><span class="linenos">148</span></a><span class="sd">    a single scalar altitude per call (see Table 3 in the project report).</span>
+</span><span id="tabulated_density-149"><a href="#tabulated_density-149"><span class="linenos">149</span></a><span class="sd">    np.interp does not extrapolate, so altitudes outside the table</span>
+</span><span id="tabulated_density-150"><a href="#tabulated_density-150"><span class="linenos">150</span></a><span class="sd">    (0 to 86,000 m) return the density at the nearest table boundary.</span>
+</span><span id="tabulated_density-151"><a href="#tabulated_density-151"><span class="linenos">151</span></a>
+</span><span id="tabulated_density-152"><a href="#tabulated_density-152"><span class="linenos">152</span></a><span class="sd">    Parameters</span>
+</span><span id="tabulated_density-153"><a href="#tabulated_density-153"><span class="linenos">153</span></a><span class="sd">    ----------</span>
+</span><span id="tabulated_density-154"><a href="#tabulated_density-154"><span class="linenos">154</span></a><span class="sd">    h : float or array_like</span>
+</span><span id="tabulated_density-155"><a href="#tabulated_density-155"><span class="linenos">155</span></a><span class="sd">        Altitude above sea level, in metres.</span>
+</span><span id="tabulated_density-156"><a href="#tabulated_density-156"><span class="linenos">156</span></a>
+</span><span id="tabulated_density-157"><a href="#tabulated_density-157"><span class="linenos">157</span></a><span class="sd">    Returns</span>
+</span><span id="tabulated_density-158"><a href="#tabulated_density-158"><span class="linenos">158</span></a><span class="sd">    -------</span>
+</span><span id="tabulated_density-159"><a href="#tabulated_density-159"><span class="linenos">159</span></a><span class="sd">    float or ndarray</span>
+</span><span id="tabulated_density-160"><a href="#tabulated_density-160"><span class="linenos">160</span></a><span class="sd">        Atmospheric density in kg/m^3.</span>
+</span><span id="tabulated_density-161"><a href="#tabulated_density-161"><span class="linenos">161</span></a><span class="sd">    """</span>
+</span><span id="tabulated_density-162"><a href="#tabulated_density-162"><span class="linenos">162</span></a>    <span class="n">h</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+</span><span id="tabulated_density-163"><a href="#tabulated_density-163"><span class="linenos">163</span></a>    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">_TABLE_ALTITUDE_M</span><span class="p">,</span> <span class="n">_TABLE_DENSITY_KGM3</span><span class="p">)</span>
 </span></pre></div>
 
 
             <div class="docstring"><p>Tabulated atmosphere model: linear interpolation over a standard
 atmosphere density table.</p>
 
-<p>Uses numpy.interp rather than scipy.interpolate.interp1d. Both do
-the same linear interpolation, but interp1d's general-purpose
-object overhead dominates runtime when called with a single
-scalar altitude on every RHS evaluation of the ODE solver
-(profiled, see Table 2 in the project report for the measured
-before/after split). np.interp is a
-dedicated 1D linear-interpolation routine with far less per-call
-overhead for exactly this use pattern.</p>
-
-<p>One behavioural difference from the previous interp1d-based
-version: np.interp does not extrapolate. A value outside the
-table range (0 to 86,000 m) is clamped to the nearest table
-boundary's density, rather than linearly extrapolated. This is
-arguably safer, it cannot return a negative density the way
-linear extrapolation technically could, and a model straying this
-far out of range (e.g. a diverging integration) is already
-flagged elsewhere by the caller's own stability checks regardless
-of what density value is returned here.</p>
+<p>Uses numpy.interp, which is faster than scipy.interpolate.interp1d for
+a single scalar altitude per call (see Table 3 in the project report).
+np.interp does not extrapolate, so altitudes outside the table
+(0 to 86,000 m) return the density at the nearest table boundary.</p>
 
 <h2 id="parameters">Parameters</h2>
 
 <p>h : float or array_like
-    Altitude above sea level, in metres. Values outside the table
-    range are clamped to the nearest boundary density rather than
-    extrapolated.</p>
+    Altitude above sea level, in metres.</p>
 
 <h2 id="returns">Returns</h2>
 
@@ -592,34 +544,34 @@ of what density value is returned here.</p>
 
     </div>
     <a class="headerlink" href="#density"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="density-186"><a href="#density-186"><span class="linenos">186</span></a><span class="k">def</span><span class="w"> </span><span class="nf">density</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">"exp"</span><span class="p">):</span>
-</span><span id="density-187"><a href="#density-187"><span class="linenos">187</span></a><span class="w">    </span><span class="sd">"""</span>
-</span><span id="density-188"><a href="#density-188"><span class="linenos">188</span></a><span class="sd">    Select and evaluate an atmospheric density model by name.</span>
-</span><span id="density-189"><a href="#density-189"><span class="linenos">189</span></a>
-</span><span id="density-190"><a href="#density-190"><span class="linenos">190</span></a><span class="sd">    Parameters</span>
-</span><span id="density-191"><a href="#density-191"><span class="linenos">191</span></a><span class="sd">    ----------</span>
-</span><span id="density-192"><a href="#density-192"><span class="linenos">192</span></a><span class="sd">    h : float or array_like</span>
-</span><span id="density-193"><a href="#density-193"><span class="linenos">193</span></a><span class="sd">        Altitude above sea level, in metres.</span>
-</span><span id="density-194"><a href="#density-194"><span class="linenos">194</span></a><span class="sd">    model : str, optional</span>
-</span><span id="density-195"><a href="#density-195"><span class="linenos">195</span></a><span class="sd">        Which model to use: "exp" for the exponential approximation,</span>
-</span><span id="density-196"><a href="#density-196"><span class="linenos">196</span></a><span class="sd">        or "table" for the tabulated/interpolated model. Default "exp".</span>
-</span><span id="density-197"><a href="#density-197"><span class="linenos">197</span></a>
-</span><span id="density-198"><a href="#density-198"><span class="linenos">198</span></a><span class="sd">    Returns</span>
-</span><span id="density-199"><a href="#density-199"><span class="linenos">199</span></a><span class="sd">    -------</span>
-</span><span id="density-200"><a href="#density-200"><span class="linenos">200</span></a><span class="sd">    float or ndarray</span>
-</span><span id="density-201"><a href="#density-201"><span class="linenos">201</span></a><span class="sd">        Atmospheric density in kg/m^3.</span>
-</span><span id="density-202"><a href="#density-202"><span class="linenos">202</span></a>
-</span><span id="density-203"><a href="#density-203"><span class="linenos">203</span></a><span class="sd">    Raises</span>
-</span><span id="density-204"><a href="#density-204"><span class="linenos">204</span></a><span class="sd">    ------</span>
-</span><span id="density-205"><a href="#density-205"><span class="linenos">205</span></a><span class="sd">    ValueError</span>
-</span><span id="density-206"><a href="#density-206"><span class="linenos">206</span></a><span class="sd">        If `model` is not "exp" or "table".</span>
-</span><span id="density-207"><a href="#density-207"><span class="linenos">207</span></a><span class="sd">    """</span>
-</span><span id="density-208"><a href="#density-208"><span class="linenos">208</span></a>    <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"exp"</span><span class="p">:</span>
-</span><span id="density-209"><a href="#density-209"><span class="linenos">209</span></a>        <span class="k">return</span> <span class="n">exponential_density</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
-</span><span id="density-210"><a href="#density-210"><span class="linenos">210</span></a>    <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"table"</span><span class="p">:</span>
-</span><span id="density-211"><a href="#density-211"><span class="linenos">211</span></a>        <span class="k">return</span> <span class="n">tabulated_density</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
-</span><span id="density-212"><a href="#density-212"><span class="linenos">212</span></a>    <span class="k">else</span><span class="p">:</span>
-</span><span id="density-213"><a href="#density-213"><span class="linenos">213</span></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown atmosphere model '</span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s2">'. Use 'exp' or 'table'."</span><span class="p">)</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="density-170"><a href="#density-170"><span class="linenos">170</span></a><span class="k">def</span><span class="w"> </span><span class="nf">density</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">"exp"</span><span class="p">):</span>
+</span><span id="density-171"><a href="#density-171"><span class="linenos">171</span></a><span class="w">    </span><span class="sd">"""</span>
+</span><span id="density-172"><a href="#density-172"><span class="linenos">172</span></a><span class="sd">    Select and evaluate an atmospheric density model by name.</span>
+</span><span id="density-173"><a href="#density-173"><span class="linenos">173</span></a>
+</span><span id="density-174"><a href="#density-174"><span class="linenos">174</span></a><span class="sd">    Parameters</span>
+</span><span id="density-175"><a href="#density-175"><span class="linenos">175</span></a><span class="sd">    ----------</span>
+</span><span id="density-176"><a href="#density-176"><span class="linenos">176</span></a><span class="sd">    h : float or array_like</span>
+</span><span id="density-177"><a href="#density-177"><span class="linenos">177</span></a><span class="sd">        Altitude above sea level, in metres.</span>
+</span><span id="density-178"><a href="#density-178"><span class="linenos">178</span></a><span class="sd">    model : str, optional</span>
+</span><span id="density-179"><a href="#density-179"><span class="linenos">179</span></a><span class="sd">        Which model to use: "exp" for the exponential approximation,</span>
+</span><span id="density-180"><a href="#density-180"><span class="linenos">180</span></a><span class="sd">        or "table" for the tabulated/interpolated model. Default "exp".</span>
+</span><span id="density-181"><a href="#density-181"><span class="linenos">181</span></a>
+</span><span id="density-182"><a href="#density-182"><span class="linenos">182</span></a><span class="sd">    Returns</span>
+</span><span id="density-183"><a href="#density-183"><span class="linenos">183</span></a><span class="sd">    -------</span>
+</span><span id="density-184"><a href="#density-184"><span class="linenos">184</span></a><span class="sd">    float or ndarray</span>
+</span><span id="density-185"><a href="#density-185"><span class="linenos">185</span></a><span class="sd">        Atmospheric density in kg/m^3.</span>
+</span><span id="density-186"><a href="#density-186"><span class="linenos">186</span></a>
+</span><span id="density-187"><a href="#density-187"><span class="linenos">187</span></a><span class="sd">    Raises</span>
+</span><span id="density-188"><a href="#density-188"><span class="linenos">188</span></a><span class="sd">    ------</span>
+</span><span id="density-189"><a href="#density-189"><span class="linenos">189</span></a><span class="sd">    ValueError</span>
+</span><span id="density-190"><a href="#density-190"><span class="linenos">190</span></a><span class="sd">        If `model` is not "exp" or "table".</span>
+</span><span id="density-191"><a href="#density-191"><span class="linenos">191</span></a><span class="sd">    """</span>
+</span><span id="density-192"><a href="#density-192"><span class="linenos">192</span></a>    <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"exp"</span><span class="p">:</span>
+</span><span id="density-193"><a href="#density-193"><span class="linenos">193</span></a>        <span class="k">return</span> <span class="n">exponential_density</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
+</span><span id="density-194"><a href="#density-194"><span class="linenos">194</span></a>    <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"table"</span><span class="p">:</span>
+</span><span id="density-195"><a href="#density-195"><span class="linenos">195</span></a>        <span class="k">return</span> <span class="n">tabulated_density</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
+</span><span id="density-196"><a href="#density-196"><span class="linenos">196</span></a>    <span class="k">else</span><span class="p">:</span>
+</span><span id="density-197"><a href="#density-197"><span class="linenos">197</span></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown atmosphere model '</span><span class="si">{</span><span class="n">model</span><span class="si">}</span><span class="s2">'. Use 'exp' or 'table'."</span><span class="p">)</span>
 </span></pre></div>
 
 
@@ -657,57 +609,57 @@ model : str, optional
 
     </div>
     <a class="headerlink" href="#plot_atmosphere_comparison"></a>
-            <div class="pdoc-code codehilite"><pre><span></span><span id="plot_atmosphere_comparison-216"><a href="#plot_atmosphere_comparison-216"><span class="linenos">216</span></a><span class="k">def</span><span class="w"> </span><span class="nf">plot_atmosphere_comparison</span><span class="p">(</span><span class="n">interp_kind</span><span class="o">=</span><span class="s2">"linear"</span><span class="p">):</span>
-</span><span id="plot_atmosphere_comparison-217"><a href="#plot_atmosphere_comparison-217"><span class="linenos">217</span></a><span class="w">    </span><span class="sd">"""</span>
-</span><span id="plot_atmosphere_comparison-218"><a href="#plot_atmosphere_comparison-218"><span class="linenos">218</span></a><span class="sd">    Plot the exponential and tabulated density models on the same</span>
-</span><span id="plot_atmosphere_comparison-219"><a href="#plot_atmosphere_comparison-219"><span class="linenos">219</span></a><span class="sd">    axes for visual comparison.</span>
+            <div class="pdoc-code codehilite"><pre><span></span><span id="plot_atmosphere_comparison-200"><a href="#plot_atmosphere_comparison-200"><span class="linenos">200</span></a><span class="k">def</span><span class="w"> </span><span class="nf">plot_atmosphere_comparison</span><span class="p">(</span><span class="n">interp_kind</span><span class="o">=</span><span class="s2">"linear"</span><span class="p">):</span>
+</span><span id="plot_atmosphere_comparison-201"><a href="#plot_atmosphere_comparison-201"><span class="linenos">201</span></a><span class="w">    </span><span class="sd">"""</span>
+</span><span id="plot_atmosphere_comparison-202"><a href="#plot_atmosphere_comparison-202"><span class="linenos">202</span></a><span class="sd">    Plot the exponential and tabulated density models on the same</span>
+</span><span id="plot_atmosphere_comparison-203"><a href="#plot_atmosphere_comparison-203"><span class="linenos">203</span></a><span class="sd">    axes for visual comparison.</span>
+</span><span id="plot_atmosphere_comparison-204"><a href="#plot_atmosphere_comparison-204"><span class="linenos">204</span></a>
+</span><span id="plot_atmosphere_comparison-205"><a href="#plot_atmosphere_comparison-205"><span class="linenos">205</span></a><span class="sd">    The exponential model is drawn as a smooth solid curve. The</span>
+</span><span id="plot_atmosphere_comparison-206"><a href="#plot_atmosphere_comparison-206"><span class="linenos">206</span></a><span class="sd">    tabulated model is drawn as markers at the actual table points</span>
+</span><span id="plot_atmosphere_comparison-207"><a href="#plot_atmosphere_comparison-207"><span class="linenos">207</span></a><span class="sd">    connected by a dotted line, since that dotted line literally *is*</span>
+</span><span id="plot_atmosphere_comparison-208"><a href="#plot_atmosphere_comparison-208"><span class="linenos">208</span></a><span class="sd">    the interpolated result between data points (currently linear;</span>
+</span><span id="plot_atmosphere_comparison-209"><a href="#plot_atmosphere_comparison-209"><span class="linenos">209</span></a><span class="sd">    pass interp_kind="cubic" once that is implemented to compare).</span>
+</span><span id="plot_atmosphere_comparison-210"><a href="#plot_atmosphere_comparison-210"><span class="linenos">210</span></a>
+</span><span id="plot_atmosphere_comparison-211"><a href="#plot_atmosphere_comparison-211"><span class="linenos">211</span></a><span class="sd">    Parameters</span>
+</span><span id="plot_atmosphere_comparison-212"><a href="#plot_atmosphere_comparison-212"><span class="linenos">212</span></a><span class="sd">    ----------</span>
+</span><span id="plot_atmosphere_comparison-213"><a href="#plot_atmosphere_comparison-213"><span class="linenos">213</span></a><span class="sd">    interp_kind : str, optional</span>
+</span><span id="plot_atmosphere_comparison-214"><a href="#plot_atmosphere_comparison-214"><span class="linenos">214</span></a><span class="sd">        Interpolation method label shown in the legend. Currently the</span>
+</span><span id="plot_atmosphere_comparison-215"><a href="#plot_atmosphere_comparison-215"><span class="linenos">215</span></a><span class="sd">        underlying interpolator is fixed to "linear" (see</span>
+</span><span id="plot_atmosphere_comparison-216"><a href="#plot_atmosphere_comparison-216"><span class="linenos">216</span></a><span class="sd">        `tabulated_density`); this parameter only affects the</span>
+</span><span id="plot_atmosphere_comparison-217"><a href="#plot_atmosphere_comparison-217"><span class="linenos">217</span></a><span class="sd">        legend text until cubic interpolation is added. Default "linear".</span>
+</span><span id="plot_atmosphere_comparison-218"><a href="#plot_atmosphere_comparison-218"><span class="linenos">218</span></a><span class="sd">    """</span>
+</span><span id="plot_atmosphere_comparison-219"><a href="#plot_atmosphere_comparison-219"><span class="linenos">219</span></a>    <span class="n">h_fine</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">_TABLE_ALTITUDE_M</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span> <span class="mi">500</span><span class="p">)</span>
 </span><span id="plot_atmosphere_comparison-220"><a href="#plot_atmosphere_comparison-220"><span class="linenos">220</span></a>
-</span><span id="plot_atmosphere_comparison-221"><a href="#plot_atmosphere_comparison-221"><span class="linenos">221</span></a><span class="sd">    The exponential model is drawn as a smooth solid curve. The</span>
-</span><span id="plot_atmosphere_comparison-222"><a href="#plot_atmosphere_comparison-222"><span class="linenos">222</span></a><span class="sd">    tabulated model is drawn as markers at the actual table points</span>
-</span><span id="plot_atmosphere_comparison-223"><a href="#plot_atmosphere_comparison-223"><span class="linenos">223</span></a><span class="sd">    connected by a dotted line, since that dotted line literally *is*</span>
-</span><span id="plot_atmosphere_comparison-224"><a href="#plot_atmosphere_comparison-224"><span class="linenos">224</span></a><span class="sd">    the interpolated result between data points (currently linear;</span>
-</span><span id="plot_atmosphere_comparison-225"><a href="#plot_atmosphere_comparison-225"><span class="linenos">225</span></a><span class="sd">    pass interp_kind="cubic" once that is implemented to compare).</span>
+</span><span id="plot_atmosphere_comparison-221"><a href="#plot_atmosphere_comparison-221"><span class="linenos">221</span></a>    <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+</span><span id="plot_atmosphere_comparison-222"><a href="#plot_atmosphere_comparison-222"><span class="linenos">222</span></a>
+</span><span id="plot_atmosphere_comparison-223"><a href="#plot_atmosphere_comparison-223"><span class="linenos">223</span></a>    <span class="c1"># Exponential model: smooth curve over the full altitude range.</span>
+</span><span id="plot_atmosphere_comparison-224"><a href="#plot_atmosphere_comparison-224"><span class="linenos">224</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">h_fine</span><span class="p">,</span> <span class="n">exponential_density</span><span class="p">(</span><span class="n">h_fine</span><span class="p">),</span> <span class="s2">"-"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"tab:blue"</span><span class="p">,</span>
+</span><span id="plot_atmosphere_comparison-225"><a href="#plot_atmosphere_comparison-225"><span class="linenos">225</span></a>             <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"Exponential model"</span><span class="p">)</span>
 </span><span id="plot_atmosphere_comparison-226"><a href="#plot_atmosphere_comparison-226"><span class="linenos">226</span></a>
-</span><span id="plot_atmosphere_comparison-227"><a href="#plot_atmosphere_comparison-227"><span class="linenos">227</span></a><span class="sd">    Parameters</span>
-</span><span id="plot_atmosphere_comparison-228"><a href="#plot_atmosphere_comparison-228"><span class="linenos">228</span></a><span class="sd">    ----------</span>
-</span><span id="plot_atmosphere_comparison-229"><a href="#plot_atmosphere_comparison-229"><span class="linenos">229</span></a><span class="sd">    interp_kind : str, optional</span>
-</span><span id="plot_atmosphere_comparison-230"><a href="#plot_atmosphere_comparison-230"><span class="linenos">230</span></a><span class="sd">        Interpolation method label shown in the legend. Currently the</span>
-</span><span id="plot_atmosphere_comparison-231"><a href="#plot_atmosphere_comparison-231"><span class="linenos">231</span></a><span class="sd">        underlying interpolator is fixed to "linear" (see</span>
-</span><span id="plot_atmosphere_comparison-232"><a href="#plot_atmosphere_comparison-232"><span class="linenos">232</span></a><span class="sd">        `tabulated_density`); this parameter only affects the</span>
-</span><span id="plot_atmosphere_comparison-233"><a href="#plot_atmosphere_comparison-233"><span class="linenos">233</span></a><span class="sd">        legend text until cubic interpolation is added. Default "linear".</span>
-</span><span id="plot_atmosphere_comparison-234"><a href="#plot_atmosphere_comparison-234"><span class="linenos">234</span></a><span class="sd">    """</span>
-</span><span id="plot_atmosphere_comparison-235"><a href="#plot_atmosphere_comparison-235"><span class="linenos">235</span></a>    <span class="n">h_fine</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">_TABLE_ALTITUDE_M</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span> <span class="mi">500</span><span class="p">)</span>
-</span><span id="plot_atmosphere_comparison-236"><a href="#plot_atmosphere_comparison-236"><span class="linenos">236</span></a>
-</span><span id="plot_atmosphere_comparison-237"><a href="#plot_atmosphere_comparison-237"><span class="linenos">237</span></a>    <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
-</span><span id="plot_atmosphere_comparison-238"><a href="#plot_atmosphere_comparison-238"><span class="linenos">238</span></a>
-</span><span id="plot_atmosphere_comparison-239"><a href="#plot_atmosphere_comparison-239"><span class="linenos">239</span></a>    <span class="c1"># Exponential model: smooth curve over the full altitude range.</span>
-</span><span id="plot_atmosphere_comparison-240"><a href="#plot_atmosphere_comparison-240"><span class="linenos">240</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">h_fine</span><span class="p">,</span> <span class="n">exponential_density</span><span class="p">(</span><span class="n">h_fine</span><span class="p">),</span> <span class="s2">"-"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"tab:blue"</span><span class="p">,</span>
-</span><span id="plot_atmosphere_comparison-241"><a href="#plot_atmosphere_comparison-241"><span class="linenos">241</span></a>             <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"Exponential model"</span><span class="p">)</span>
-</span><span id="plot_atmosphere_comparison-242"><a href="#plot_atmosphere_comparison-242"><span class="linenos">242</span></a>
-</span><span id="plot_atmosphere_comparison-243"><a href="#plot_atmosphere_comparison-243"><span class="linenos">243</span></a>    <span class="c1"># COESA 1976 model: the true underlying curve, evaluated directly</span>
-</span><span id="plot_atmosphere_comparison-244"><a href="#plot_atmosphere_comparison-244"><span class="linenos">244</span></a>    <span class="c1"># (no interpolation). Plotted as a dashed line so it remains visible</span>
-</span><span id="plot_atmosphere_comparison-245"><a href="#plot_atmosphere_comparison-245"><span class="linenos">245</span></a>    <span class="c1"># even where it nearly overlaps the interpolated table below.</span>
-</span><span id="plot_atmosphere_comparison-246"><a href="#plot_atmosphere_comparison-246"><span class="linenos">246</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">h_fine</span><span class="p">,</span> <span class="n">coesa_density</span><span class="p">(</span><span class="n">h_fine</span><span class="p">),</span> <span class="s2">"--"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"tab:green"</span><span class="p">,</span>
-</span><span id="plot_atmosphere_comparison-247"><a href="#plot_atmosphere_comparison-247"><span class="linenos">247</span></a>             <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"COESA 1976 model (exact evaluation)"</span><span class="p">)</span>
-</span><span id="plot_atmosphere_comparison-248"><a href="#plot_atmosphere_comparison-248"><span class="linenos">248</span></a>
-</span><span id="plot_atmosphere_comparison-249"><a href="#plot_atmosphere_comparison-249"><span class="linenos">249</span></a>    <span class="c1"># Tabulated model: table points connected with a dotted line (this</span>
-</span><span id="plot_atmosphere_comparison-250"><a href="#plot_atmosphere_comparison-250"><span class="linenos">250</span></a>    <span class="c1"># dotted line *is* the interpolated result). Markers kept small</span>
-</span><span id="plot_atmosphere_comparison-251"><a href="#plot_atmosphere_comparison-251"><span class="linenos">251</span></a>    <span class="c1"># since the table is now densely sampled (1 km spacing).</span>
-</span><span id="plot_atmosphere_comparison-252"><a href="#plot_atmosphere_comparison-252"><span class="linenos">252</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">_TABLE_ALTITUDE_M</span><span class="p">,</span> <span class="n">_TABLE_DENSITY_KGM3</span><span class="p">,</span> <span class="s2">"o:"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"tab:orange"</span><span class="p">,</span>
-</span><span id="plot_atmosphere_comparison-253"><a href="#plot_atmosphere_comparison-253"><span class="linenos">253</span></a>             <span class="n">linewidth</span><span class="o">=</span><span class="mf">1.2</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-</span><span id="plot_atmosphere_comparison-254"><a href="#plot_atmosphere_comparison-254"><span class="linenos">254</span></a>             <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s2">"Tabulated model (</span><span class="si">{</span><span class="n">interp_kind</span><span class="si">}</span><span class="s2"> interpolation, "</span>
-</span><span id="plot_atmosphere_comparison-255"><a href="#plot_atmosphere_comparison-255"><span class="linenos">255</span></a>                   <span class="sa">f</span><span class="s2">"COESA 1976, 1 km spacing)"</span><span class="p">)</span>
-</span><span id="plot_atmosphere_comparison-256"><a href="#plot_atmosphere_comparison-256"><span class="linenos">256</span></a>
-</span><span id="plot_atmosphere_comparison-257"><a href="#plot_atmosphere_comparison-257"><span class="linenos">257</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">set_yscale</span><span class="p">(</span><span class="s2">"log"</span><span class="p">)</span>  <span class="c1"># density spans several orders of magnitude</span>
-</span><span id="plot_atmosphere_comparison-258"><a href="#plot_atmosphere_comparison-258"><span class="linenos">258</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">"Altitude, h (m)"</span><span class="p">)</span>
-</span><span id="plot_atmosphere_comparison-259"><a href="#plot_atmosphere_comparison-259"><span class="linenos">259</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">"Density, $\rho$ (kg/m$^3$)"</span><span class="p">)</span>
-</span><span id="plot_atmosphere_comparison-260"><a href="#plot_atmosphere_comparison-260"><span class="linenos">260</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">"Atmospheric density models: exponential vs. tabulated"</span><span class="p">)</span>
-</span><span id="plot_atmosphere_comparison-261"><a href="#plot_atmosphere_comparison-261"><span class="linenos">261</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
-</span><span id="plot_atmosphere_comparison-262"><a href="#plot_atmosphere_comparison-262"><span class="linenos">262</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">which</span><span class="o">=</span><span class="s2">"both"</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">"--"</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.4</span><span class="p">)</span>
-</span><span id="plot_atmosphere_comparison-263"><a href="#plot_atmosphere_comparison-263"><span class="linenos">263</span></a>    <span class="n">fig</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
-</span><span id="plot_atmosphere_comparison-264"><a href="#plot_atmosphere_comparison-264"><span class="linenos">264</span></a>    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
-</span><span id="plot_atmosphere_comparison-265"><a href="#plot_atmosphere_comparison-265"><span class="linenos">265</span></a>
-</span><span id="plot_atmosphere_comparison-266"><a href="#plot_atmosphere_comparison-266"><span class="linenos">266</span></a>    <span class="k">return</span> <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span>
+</span><span id="plot_atmosphere_comparison-227"><a href="#plot_atmosphere_comparison-227"><span class="linenos">227</span></a>    <span class="c1"># COESA 1976 model: the true underlying curve, evaluated directly</span>
+</span><span id="plot_atmosphere_comparison-228"><a href="#plot_atmosphere_comparison-228"><span class="linenos">228</span></a>    <span class="c1"># (no interpolation). Plotted as a dashed line so it remains visible</span>
+</span><span id="plot_atmosphere_comparison-229"><a href="#plot_atmosphere_comparison-229"><span class="linenos">229</span></a>    <span class="c1"># even where it nearly overlaps the interpolated table below.</span>
+</span><span id="plot_atmosphere_comparison-230"><a href="#plot_atmosphere_comparison-230"><span class="linenos">230</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">h_fine</span><span class="p">,</span> <span class="n">coesa_density</span><span class="p">(</span><span class="n">h_fine</span><span class="p">),</span> <span class="s2">"--"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"tab:green"</span><span class="p">,</span>
+</span><span id="plot_atmosphere_comparison-231"><a href="#plot_atmosphere_comparison-231"><span class="linenos">231</span></a>             <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"COESA 1976 model (exact evaluation)"</span><span class="p">)</span>
+</span><span id="plot_atmosphere_comparison-232"><a href="#plot_atmosphere_comparison-232"><span class="linenos">232</span></a>
+</span><span id="plot_atmosphere_comparison-233"><a href="#plot_atmosphere_comparison-233"><span class="linenos">233</span></a>    <span class="c1"># Tabulated model: table points connected with a dotted line (this</span>
+</span><span id="plot_atmosphere_comparison-234"><a href="#plot_atmosphere_comparison-234"><span class="linenos">234</span></a>    <span class="c1"># dotted line *is* the interpolated result). Markers kept small</span>
+</span><span id="plot_atmosphere_comparison-235"><a href="#plot_atmosphere_comparison-235"><span class="linenos">235</span></a>    <span class="c1"># since the table is now densely sampled (1 km spacing).</span>
+</span><span id="plot_atmosphere_comparison-236"><a href="#plot_atmosphere_comparison-236"><span class="linenos">236</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">_TABLE_ALTITUDE_M</span><span class="p">,</span> <span class="n">_TABLE_DENSITY_KGM3</span><span class="p">,</span> <span class="s2">"o:"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"tab:orange"</span><span class="p">,</span>
+</span><span id="plot_atmosphere_comparison-237"><a href="#plot_atmosphere_comparison-237"><span class="linenos">237</span></a>             <span class="n">linewidth</span><span class="o">=</span><span class="mf">1.2</span><span class="p">,</span> <span class="n">markersize</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+</span><span id="plot_atmosphere_comparison-238"><a href="#plot_atmosphere_comparison-238"><span class="linenos">238</span></a>             <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s2">"Tabulated model (</span><span class="si">{</span><span class="n">interp_kind</span><span class="si">}</span><span class="s2"> interpolation, "</span>
+</span><span id="plot_atmosphere_comparison-239"><a href="#plot_atmosphere_comparison-239"><span class="linenos">239</span></a>                   <span class="sa">f</span><span class="s2">"COESA 1976, 1 km spacing)"</span><span class="p">)</span>
+</span><span id="plot_atmosphere_comparison-240"><a href="#plot_atmosphere_comparison-240"><span class="linenos">240</span></a>
+</span><span id="plot_atmosphere_comparison-241"><a href="#plot_atmosphere_comparison-241"><span class="linenos">241</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">set_yscale</span><span class="p">(</span><span class="s2">"log"</span><span class="p">)</span>  <span class="c1"># density spans several orders of magnitude</span>
+</span><span id="plot_atmosphere_comparison-242"><a href="#plot_atmosphere_comparison-242"><span class="linenos">242</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">"Altitude, h (m)"</span><span class="p">)</span>
+</span><span id="plot_atmosphere_comparison-243"><a href="#plot_atmosphere_comparison-243"><span class="linenos">243</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">"Density, $\rho$ (kg/m$^3$)"</span><span class="p">)</span>
+</span><span id="plot_atmosphere_comparison-244"><a href="#plot_atmosphere_comparison-244"><span class="linenos">244</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">"Atmospheric density models: exponential vs. tabulated"</span><span class="p">)</span>
+</span><span id="plot_atmosphere_comparison-245"><a href="#plot_atmosphere_comparison-245"><span class="linenos">245</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+</span><span id="plot_atmosphere_comparison-246"><a href="#plot_atmosphere_comparison-246"><span class="linenos">246</span></a>    <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">which</span><span class="o">=</span><span class="s2">"both"</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">"--"</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.4</span><span class="p">)</span>
+</span><span id="plot_atmosphere_comparison-247"><a href="#plot_atmosphere_comparison-247"><span class="linenos">247</span></a>    <span class="n">fig</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</span><span id="plot_atmosphere_comparison-248"><a href="#plot_atmosphere_comparison-248"><span class="linenos">248</span></a>    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</span><span id="plot_atmosphere_comparison-249"><a href="#plot_atmosphere_comparison-249"><span class="linenos">249</span></a>
+</span><span id="plot_atmosphere_comparison-250"><a href="#plot_atmosphere_comparison-250"><span class="linenos">250</span></a>    <span class="k">return</span> <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span>
 </span></pre></div>
 
 

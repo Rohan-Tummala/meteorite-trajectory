@@ -1,33 +1,20 @@
 """
 sensitivity_sweep.py
 
-Parameter sensitivity sweep for both falls: perturbs Cd and sigma_abl
-one at a time around their default values and measures how far the
-predicted impact point shifts, to check whether coefficient
-uncertainty could plausibly explain the gap between the predicted and
-real recovery site (see plot_trajectory_cavezzo.py and
-plot_trajectory_bunburra.py).
+One-at-a-time sensitivity sweep of Cd and sigma_abl for both falls.
+Each is perturbed around its default and the shift in the predicted
+impact point is reported, to check whether coefficient uncertainty
+could explain the gap to the real recovery site.
 
-Only Cd and sigma_abl are swept. Both are genuinely assumed rather
-than measured for either fall: Cd is a generic hypersonic blunt-body
-value, and sigma_abl is fitted from a different fall entirely (Lost
-City, Ceplecha et al. 1998), not Cavezzo or Bunburra. rho_m (bulk
-density) and M0 (initial mass) are NOT swept here. rho_m is an actual
-measured value for each fall (Cavezzo fragment F2, Gardiol et al.
-2021; Bunburra's recovered fragments, Spurny et al. 2012), not an
-unknown or generalized parameter. M0 is already sampled with its own
-reported uncertainty as part of the entry-state Monte Carlo
-(monte_carlo_uncertainty_*.py), so sweeping it here too would double
-count the same uncertainty in two different checks.
+Only Cd and sigma_abl are swept, since both are assumed rather than
+measured for each fall. rho_m is a measured value, and M0 is already
+sampled in the Monte Carlo (monte_carlo_uncertainty_*.py).
 
-Ranges used:
-    - sigma_abl: the actual reported range from Ceplecha et al.
-      (1998, Table VII), 1.1e-8 to 1.5e-8 kg/J.
-    - Cd: no published uncertainty range exists (it is not fitted
-      per fall), so it is swept +/-10% as a generic engineering
-      bound rather than a sourced uncertainty. This is noted
-      explicitly in the output so the two kinds of range are never
-      conflated.
+Ranges:
+    - sigma_abl: 1.1e-8 to 1.5e-8 kg/J, the range reported by Ceplecha
+      et al. (1998, Table VII).
+    - Cd: +/-10% of the default, a generic engineering bound since no
+      published range exists.
 """
 
 import numpy as np

@@ -57,7 +57,7 @@
 
                         <div class="docstring"><p>profile_compare.py</p>
 
-<p>Reproduces Table 2 in the report: profiles the Cavezzo RK45 run with
+<p>Reproduces Table 3 in the report: profiles the Cavezzo RK45 run with
 the OLD atmosphere.py (scipy's interp1d) against the CURRENT
 atmosphere.py (np.interp), to measure the actual speedup from the
 interpolation swap rather than quoting a number nobody can check.</p>
@@ -82,7 +82,7 @@ clean, consistent set of modules.</p>
                         <div class="pdoc-code codehilite"><pre><span></span><span id="L-1"><a href="#L-1"><span class="linenos">  1</span></a><span class="sd">"""</span>
 </span><span id="L-2"><a href="#L-2"><span class="linenos">  2</span></a><span class="sd">profile_compare.py</span>
 </span><span id="L-3"><a href="#L-3"><span class="linenos">  3</span></a>
-</span><span id="L-4"><a href="#L-4"><span class="linenos">  4</span></a><span class="sd">Reproduces Table 2 in the report: profiles the Cavezzo RK45 run with</span>
+</span><span id="L-4"><a href="#L-4"><span class="linenos">  4</span></a><span class="sd">Reproduces Table 3 in the report: profiles the Cavezzo RK45 run with</span>
 </span><span id="L-5"><a href="#L-5"><span class="linenos">  5</span></a><span class="sd">the OLD atmosphere.py (scipy's interp1d) against the CURRENT</span>
 </span><span id="L-6"><a href="#L-6"><span class="linenos">  6</span></a><span class="sd">atmosphere.py (np.interp), to measure the actual speedup from the</span>
 </span><span id="L-7"><a href="#L-7"><span class="linenos">  7</span></a><span class="sd">interpolation swap rather than quoting a number nobody can check.</span>
@@ -203,7 +203,7 @@ clean, consistent set of modules.</p>
 </span><span id="L-122"><a href="#L-122"><span class="linenos">122</span></a><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
 </span><span id="L-123"><a href="#L-123"><span class="linenos">123</span></a><span class="w">    </span><span class="sd">"""Profile the OLD (interp1d) and CURRENT (np.interp) atmosphere.py</span>
 </span><span id="L-124"><a href="#L-124"><span class="linenos">124</span></a><span class="sd">    on the same Cavezzo RK45 run and print both so they can be</span>
-</span><span id="L-125"><a href="#L-125"><span class="linenos">125</span></a><span class="sd">    compared directly, as Table 2 in the report does."""</span>
+</span><span id="L-125"><a href="#L-125"><span class="linenos">125</span></a><span class="sd">    compared directly, as Table 3 in the report does."""</span>
 </span><span id="L-126"><a href="#L-126"><span class="linenos">126</span></a>    <span class="n">old_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">THIS_DIR</span><span class="p">,</span> <span class="s2">"atmosphere_OLD_interp1d.py"</span><span class="p">)</span>
 </span><span id="L-127"><a href="#L-127"><span class="linenos">127</span></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">old_path</span><span class="p">):</span>
 </span><span id="L-128"><a href="#L-128"><span class="linenos">128</span></a>        <span class="nb">print</span><span class="p">(</span><span class="s2">"Missing atmosphere_OLD_interp1d.py next to this script."</span><span class="p">)</span>
@@ -264,7 +264,7 @@ clean, consistent set of modules.</p>
             <div class="pdoc-code codehilite"><pre><span></span><span id="main-123"><a href="#main-123"><span class="linenos">123</span></a><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
 </span><span id="main-124"><a href="#main-124"><span class="linenos">124</span></a><span class="w">    </span><span class="sd">"""Profile the OLD (interp1d) and CURRENT (np.interp) atmosphere.py</span>
 </span><span id="main-125"><a href="#main-125"><span class="linenos">125</span></a><span class="sd">    on the same Cavezzo RK45 run and print both so they can be</span>
-</span><span id="main-126"><a href="#main-126"><span class="linenos">126</span></a><span class="sd">    compared directly, as Table 2 in the report does."""</span>
+</span><span id="main-126"><a href="#main-126"><span class="linenos">126</span></a><span class="sd">    compared directly, as Table 3 in the report does."""</span>
 </span><span id="main-127"><a href="#main-127"><span class="linenos">127</span></a>    <span class="n">old_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">THIS_DIR</span><span class="p">,</span> <span class="s2">"atmosphere_OLD_interp1d.py"</span><span class="p">)</span>
 </span><span id="main-128"><a href="#main-128"><span class="linenos">128</span></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">old_path</span><span class="p">):</span>
 </span><span id="main-129"><a href="#main-129"><span class="linenos">129</span></a>        <span class="nb">print</span><span class="p">(</span><span class="s2">"Missing atmosphere_OLD_interp1d.py next to this script."</span><span class="p">)</span>
@@ -284,7 +284,7 @@ clean, consistent set of modules.</p>
 
             <div class="docstring"><p>Profile the OLD (interp1d) and CURRENT (np.interp) atmosphere.py
 on the same Cavezzo RK45 run and print both so they can be
-compared directly, as Table 2 in the report does.</p>
+compared directly, as Table 3 in the report does.</p>
 </div>
 
 
