@@ -84,6 +84,7 @@ def height_validation_rmse(sol, t_data, h_data):
 
 
 def plot_full_trajectory():
+    """Integrate the Cavezzo fall with RK45, print the miss distance to the real recovery site, and plot altitude, mass and ground track."""
     y0 = initial_state()
     t_span = (0.0, 600.0)
 

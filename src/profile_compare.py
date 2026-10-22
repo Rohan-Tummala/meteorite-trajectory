@@ -1,7 +1,7 @@
 """
 profile_compare.py
 
-Reproduces Table 2 in the report: profiles the Cavezzo RK45 run with
+Reproduces Table 3 in the report: profiles the Cavezzo RK45 run with
 the OLD atmosphere.py (scipy's interp1d) against the CURRENT
 atmosphere.py (np.interp), to measure the actual speedup from the
 interpolation swap rather than quoting a number nobody can check.
@@ -122,7 +122,7 @@ def _cumtime_for_any(stats, func_names):
 def main():
     """Profile the OLD (interp1d) and CURRENT (np.interp) atmosphere.py
     on the same Cavezzo RK45 run and print both so they can be
-    compared directly, as Table 2 in the report does."""
+    compared directly, as Table 3 in the report does."""
     old_path = os.path.join(THIS_DIR, "atmosphere_OLD_interp1d.py")
     if not os.path.exists(old_path):
         print("Missing atmosphere_OLD_interp1d.py next to this script.")

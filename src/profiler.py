@@ -17,6 +17,7 @@ from scipy.integrate import solve_ivp
 
 
 def run():
+    """Run one Cavezzo RK45 trajectory (rtol=1e-7, atol=1e-9) to ground impact and return the solve_ivp result."""
     y0 = initial_state()
     ground_impact_event.terminal = True
     ground_impact_event.direction = -1

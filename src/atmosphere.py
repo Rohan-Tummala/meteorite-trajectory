@@ -143,31 +143,15 @@ def tabulated_density(h):
     Tabulated atmosphere model: linear interpolation over a standard
     atmosphere density table.
 
-    Uses numpy.interp rather than scipy.interpolate.interp1d. Both do
-    the same linear interpolation, but interp1d's general-purpose
-    object overhead dominates runtime when called with a single
-    scalar altitude on every RHS evaluation of the ODE solver
-    (profiled, see Table 2 in the project report for the measured
-    before/after split). np.interp is a
-    dedicated 1D linear-interpolation routine with far less per-call
-    overhead for exactly this use pattern.
-
-    One behavioural difference from the previous interp1d-based
-    version: np.interp does not extrapolate. A value outside the
-    table range (0 to 86,000 m) is clamped to the nearest table
-    boundary's density, rather than linearly extrapolated. This is
-    arguably safer, it cannot return a negative density the way
-    linear extrapolation technically could, and a model straying this
-    far out of range (e.g. a diverging integration) is already
-    flagged elsewhere by the caller's own stability checks regardless
-    of what density value is returned here.
+    Uses numpy.interp, which is faster than scipy.interpolate.interp1d for
+    a single scalar altitude per call (see Table 3 in the project report).
+    np.interp does not extrapolate, so altitudes outside the table
+    (0 to 86,000 m) return the density at the nearest table boundary.
 
     Parameters
     ----------
     h : float or array_like
-        Altitude above sea level, in metres. Values outside the table
-        range are clamped to the nearest boundary density rather than
-        extrapolated.
+        Altitude above sea level, in metres.
 
     Returns
     -------
